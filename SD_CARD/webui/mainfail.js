@@ -509,12 +509,13 @@ function mf_startPolling(){
 }
 
 /* SD File Explorer */
-var mf_sdExplorer={ready:false,path:'/',selected:null,files:[]};
+var mf_sdExplorer={ready:false,path:'/',root:'/',selected:null,files:[]};
 
 function mf_sdInit(){
   if(mf_sdExplorer.ready) return;
   mf_sdExplorer.ready=true;
-  mf_sdList('/');
+  mf_sdExplorer.root=mf_sdRoot();
+  mf_sdList(mf_sdInitialPath());
 }
 
 function mf_sdStatus(msg,isError){
@@ -529,6 +530,19 @@ function mf_sdCleanPath(p){
   if(p.charAt(0)!=='/') p='/'+p;
   if(p.length>1 && p.charAt(p.length-1)!=='/') p+='/';
   return p;
+}
+
+function mf_sdRoot(){
+  var base=typeof mf_sdBase==='function'?mf_sdBase():'';
+  if(!base&&typeof primary_sd==='string') base=primary_sd;
+  return mf_sdCleanPath(base||'/');
+}
+
+function mf_sdInitialPath(){
+  var current='';
+  try{if(typeof files_currentPath==='string'&&files_currentPath) current=files_currentPath}catch(e){}
+  current=current?mf_sdCleanPath(current):mf_sdExplorer.root;
+  return current.indexOf(mf_sdExplorer.root)===0?current:mf_sdExplorer.root;
 }
 
 function mf_sdJoin(dir,name){
@@ -552,6 +566,8 @@ function mf_sdHttpPath(full){
   full=String(full||'/').replace(/\\/g,'/');
   if(full.charAt(0)!=='/') full='/'+full;
   var base=typeof mf_sdBase==='function'?mf_sdBase():'';
+  base=String(base||'').replace(/\/$/,'');
+  if(base&&(full===base||full.indexOf(base+'/')===0)) return encodeURI(full);
   return encodeURI(base+full);
 }
 
@@ -568,7 +584,9 @@ function mf_sdRequest(method,url,data,ok,fail){
 }
 
 function mf_sdList(path){
+  if(!mf_sdExplorer.root||mf_sdExplorer.root==='/') mf_sdExplorer.root=mf_sdRoot();
   if(path) mf_sdExplorer.path=mf_sdCleanPath(path);
+  if(mf_sdExplorer.path.indexOf(mf_sdExplorer.root)!==0) mf_sdExplorer.path=mf_sdExplorer.root;
   var input=document.getElementById('mf_sd_path');
   if(input) input.value=mf_sdExplorer.path;
   mf_sdStatus('Listing '+mf_sdExplorer.path+' ...');
@@ -596,7 +614,7 @@ function mf_sdRenderList(items){
   var el=document.getElementById('mf_sd_file_list');
   if(!el) return;
   var h='';
-  if(mf_sdExplorer.path!=='/') h+='<div class="mf-sd-row" onclick="mf_sdUp()"><span class="mf-sd-icon">[..]</span><span class="mf-sd-name">Up</span><span class="mf-sd-size"></span></div>';
+  if(mf_sdExplorer.path!==mf_sdExplorer.root) h+='<div class="mf-sd-row" onclick="mf_sdUp()"><span class="mf-sd-icon">[..]</span><span class="mf-sd-name">Up</span><span class="mf-sd-size"></span></div>';
   if(!mf_sdExplorer.files.length) h+='<div class="mf-sd-empty">No files found.</div>';
   for(var i=0;i<mf_sdExplorer.files.length;i++){
     var f=mf_sdExplorer.files[i];
@@ -624,7 +642,9 @@ function mf_sdOpenPath(){
 function mf_sdUp(){
   var p=mf_sdExplorer.path.replace(/\/$/,'');
   var i=p.lastIndexOf('/');
-  mf_sdList(i<=0?'/':p.substring(0,i+1));
+  var next=i<=0?mf_sdExplorer.root:p.substring(0,i+1);
+  if(next.indexOf(mf_sdExplorer.root)!==0) next=mf_sdExplorer.root;
+  mf_sdList(next);
 }
 
 function mf_sdOpenItem(i){
