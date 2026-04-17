@@ -14,6 +14,7 @@ function mf_switchTab(t){
   document.querySelectorAll('.mf-nav-item').forEach(function(n){n.classList.remove('active')});
   var nav=document.getElementById('mf-nav-'+t);
   if(nav)nav.classList.add('active');
+  if(t==='files' && typeof mf_sdInit==='function') setTimeout(mf_sdInit,0);
 }
 function mf_toggleCard(h){var b=h.nextElementSibling;if(b)b.style.display=b.style.display==='none'?'':'none'}
 function mf_openSidebar(){
@@ -505,6 +506,203 @@ function mf_startPolling(){
     poll={temperature:1,position:1,status:2};
   }
   console.log('[MF] Polling: temp='+poll.temperature+'s pos='+poll.position+'s status='+poll.status+'s');
+}
+
+/* SD File Explorer */
+var mf_sdExplorer={ready:false,path:'/',selected:null,files:[]};
+
+function mf_sdInit(){
+  if(mf_sdExplorer.ready) return;
+  mf_sdExplorer.ready=true;
+  mf_sdList('/');
+}
+
+function mf_sdStatus(msg,isError){
+  var el=document.getElementById('mf_sd_status');
+  if(!el) return;
+  el.textContent=msg;
+  el.style.color=isError?'var(--mf-red)':'var(--mf-dim)';
+}
+
+function mf_sdCleanPath(p){
+  p=String(p||'/').replace(/\\/g,'/').replace(/\/+/g,'/');
+  if(p.charAt(0)!=='/') p='/'+p;
+  if(p.length>1 && p.charAt(p.length-1)!=='/') p+='/';
+  return p;
+}
+
+function mf_sdJoin(dir,name){
+  dir=mf_sdCleanPath(dir);
+  return dir+(name||'');
+}
+
+function mf_sdDirOf(full){
+  full=String(full||'/').replace(/\\/g,'/');
+  var i=full.lastIndexOf('/');
+  return i<=0?'/':full.substring(0,i+1);
+}
+
+function mf_sdNameOf(full){
+  full=String(full||'').replace(/\\/g,'/');
+  var i=full.lastIndexOf('/');
+  return i<0?full:full.substring(i+1);
+}
+
+function mf_sdHttpPath(full){
+  full=String(full||'/').replace(/\\/g,'/');
+  if(full.charAt(0)!=='/') full='/'+full;
+  var base=typeof mf_sdBase==='function'?mf_sdBase():'';
+  return encodeURI(base+full);
+}
+
+function mf_sdRequest(method,url,data,ok,fail){
+  var x=new XMLHttpRequest();
+  x.onreadystatechange=function(){
+    if(x.readyState===4){
+      if(x.status>=200&&x.status<300) ok&&ok(x.responseText,x);
+      else fail&&fail(x.status,x.responseText||x.statusText);
+    }
+  };
+  x.open(method,url,true);
+  x.send(data||null);
+}
+
+function mf_sdList(path){
+  if(path) mf_sdExplorer.path=mf_sdCleanPath(path);
+  var input=document.getElementById('mf_sd_path');
+  if(input) input.value=mf_sdExplorer.path;
+  mf_sdStatus('Listing '+mf_sdExplorer.path+' ...');
+  mf_sdRequest('GET','/upload?path='+encodeURIComponent(mf_sdExplorer.path),null,function(txt){
+    var data=null;
+    try{data=JSON.parse(txt)}catch(e){}
+    if(!data||!data.files){mf_sdRenderList([]);mf_sdStatus('No list data returned for '+mf_sdExplorer.path,true);return}
+    var items=data.files.map(function(f){
+      var isdir=String(f.size)==='-1'||f.type==='dir'||f.isdir===true;
+      return {name:f.name||f.shortname||'',sdname:f.name||f.shortname||'',size:isdir?'':f.size,isdir:isdir,datetime:f.datetime||''};
+    }).filter(function(f){return f.name});
+    mf_sdRenderList(items);
+    mf_sdStatus((data.status||'OK')+' - '+items.length+' item(s)');
+  },function(code,msg){
+    mf_sdRenderList([]);
+    mf_sdStatus('List failed '+code+': '+msg,true);
+  });
+}
+
+function mf_sdRenderList(items){
+  mf_sdExplorer.files=items.slice().sort(function(a,b){
+    if(a.isdir!==b.isdir) return a.isdir?-1:1;
+    return a.name.localeCompare(b.name);
+  });
+  var el=document.getElementById('mf_sd_file_list');
+  if(!el) return;
+  var h='';
+  if(mf_sdExplorer.path!=='/') h+='<div class="mf-sd-row" onclick="mf_sdUp()"><span class="mf-sd-icon">[..]</span><span class="mf-sd-name">Up</span><span class="mf-sd-size"></span></div>';
+  if(!mf_sdExplorer.files.length) h+='<div class="mf-sd-empty">No files found.</div>';
+  for(var i=0;i<mf_sdExplorer.files.length;i++){
+    var f=mf_sdExplorer.files[i];
+    h+='<div class="mf-sd-row" onclick="mf_sdOpenItem('+i+')">'+
+      '<span class="mf-sd-icon">'+(f.isdir?'[D]':'[F]')+'</span>'+
+      '<span class="mf-sd-name" title="'+mf_escapeHtml(f.name)+'">'+mf_escapeHtml(f.name)+'</span>'+
+      '<span class="mf-sd-size">'+(f.isdir?'':mf_escapeHtml(mf_sdFormatSize(f.size)))+'</span></div>';
+  }
+  el.innerHTML=h;
+}
+
+function mf_sdFormatSize(size){
+  var n=parseInt(size,10);
+  if(!isFinite(n)) return '';
+  if(n<1024) return n+' B';
+  if(n<1048576) return (n/1024).toFixed(1)+' KB';
+  return (n/1048576).toFixed(2)+' MB';
+}
+
+function mf_sdOpenPath(){
+  var el=document.getElementById('mf_sd_path');
+  mf_sdList(el?el.value:mf_sdExplorer.path);
+}
+
+function mf_sdUp(){
+  var p=mf_sdExplorer.path.replace(/\/$/,'');
+  var i=p.lastIndexOf('/');
+  mf_sdList(i<=0?'/':p.substring(0,i+1));
+}
+
+function mf_sdOpenItem(i){
+  var f=mf_sdExplorer.files[i];
+  if(!f) return;
+  if(f.isdir){mf_sdList(mf_sdJoin(mf_sdExplorer.path,f.name));return}
+  mf_sdLoadFile(mf_sdJoin(mf_sdExplorer.path,f.sdname||f.name),f.name);
+}
+
+function mf_sdLoadFile(full,label){
+  mf_sdExplorer.selected=full;
+  var name=document.getElementById('mf_sd_editor_name');
+  if(name) name.textContent=full;
+  mf_sdStatus('Loading '+full+' ...');
+  mf_sdRequest('GET',mf_sdHttpPath(full)+'?'+Date.now(),null,function(txt){
+    var ed=document.getElementById('mf_sd_editor');
+    if(ed) ed.value=txt;
+    mf_sdStatus('Loaded '+(label||mf_sdNameOf(full)));
+  },function(code,msg){
+    mf_sdStatus('Read failed '+code+': '+msg,true);
+  });
+}
+
+function mf_sdReloadFile(){
+  if(!mf_sdExplorer.selected){mf_sdStatus('No file selected',true);return}
+  mf_sdLoadFile(mf_sdExplorer.selected);
+}
+
+function mf_sdSaveFile(){
+  if(!mf_sdExplorer.selected){mf_sdStatus('No file selected',true);return}
+  if(mf_state==='printing'){mf_sdStatus('Save blocked while printing',true);return}
+  var ed=document.getElementById('mf_sd_editor');
+  var dir=mf_sdDirOf(mf_sdExplorer.selected), name=mf_sdNameOf(mf_sdExplorer.selected);
+  mf_sdUploadBlob(dir,name,ed?ed.value:'',function(){mf_sdStatus('Saved '+name);mf_sdList(dir)},function(code,msg){mf_sdStatus('Save failed '+code+': '+msg,true)});
+}
+
+function mf_sdUploadBlob(dir,name,text,ok,fail){
+  var b=new Blob([text],{type:'text/plain'});
+  var fd=new FormData();
+  fd.append('path',dir);
+  fd.append('myfile[]',new File([b],name),dir+name);
+  mf_sdRequest('POST','/upload',fd,function(txt){ok&&ok(txt)},fail);
+}
+
+function mf_sdUploadFiles(files){
+  if(!files||!files.length) return;
+  if(mf_state==='printing'){mf_sdStatus('Upload blocked while printing',true);return}
+  var fd=new FormData();
+  fd.append('path',mf_sdExplorer.path);
+  for(var i=0;i<files.length;i++) fd.append('myfile[]',files[i],mf_sdExplorer.path+files[i].name);
+  mf_sdStatus('Uploading '+files.length+' file(s) ...');
+  mf_sdRequest('POST','/upload',fd,function(){mf_sdStatus('Upload complete');mf_sdList(mf_sdExplorer.path)},function(code,msg){mf_sdStatus('Upload failed '+code+': '+msg,true)});
+  var input=document.getElementById('mf_sd_upload');
+  if(input) input.value='';
+}
+
+function mf_sdNewFolder(){
+  if(mf_state==='printing'){mf_sdStatus('Folder creation blocked while printing',true);return}
+  var name=prompt('Folder name');
+  if(!name) return;
+  name=name.replace(/[\\\/]/g,'').trim();
+  if(!name){mf_sdStatus('Invalid folder name',true);return}
+  var url='/upload?path='+encodeURIComponent(mf_sdExplorer.path)+'&action=createdir&filename='+encodeURIComponent(name);
+  mf_sdRequest('GET',url,null,function(){mf_sdStatus('Created '+name);mf_sdList(mf_sdExplorer.path)},function(code,msg){mf_sdStatus('Create folder failed '+code+': '+msg,true)});
+}
+
+function mf_sdDeleteSelected(){
+  if(!mf_sdExplorer.selected){mf_sdStatus('No file selected',true);return}
+  if(mf_state==='printing'){mf_sdStatus('Delete blocked while printing',true);return}
+  var full=mf_sdExplorer.selected, dir=mf_sdDirOf(full), name=mf_sdNameOf(full);
+  if(!confirm('Delete '+full+' ?')) return;
+  var url='/upload?path='+encodeURIComponent(dir)+'&action=delete&filename='+encodeURIComponent(name);
+  mf_sdRequest('GET',url,null,function(){
+    mf_sdExplorer.selected=null;
+    var ed=document.getElementById('mf_sd_editor'); if(ed) ed.value='';
+    var title=document.getElementById('mf_sd_editor_name'); if(title) title.textContent='No file selected';
+    mf_sdStatus('Deleted '+name);mf_sdList(dir);
+  },function(code,msg){mf_sdStatus('Delete failed '+code+': '+msg,true)});
 }
 
 function mf_setupHooks(){

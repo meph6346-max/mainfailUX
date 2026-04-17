@@ -489,3 +489,25 @@ meter { height: 8px; }
 .mf-ext-list .mf-ext-item .mf-ext-icon{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--mf-s3);border-radius:6px}
 .mf-ext-list .mf-ext-item .mf-ext-name{flex:1;font-weight:500;color:var(--mf-text)}
 .mf-ext-list .mf-ext-item .mf-ext-url{font-size:11px;color:var(--mf-dim)}
+
+/* SD File Explorer */
+.mf-sd-explorer{margin-top:12px;background:var(--mf-s1);border:1px solid var(--mf-border);border-radius:var(--mf-card-r);overflow:hidden}
+.mf-sd-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;background:var(--mf-s2);border-bottom:1px solid var(--mf-border)}
+.mf-sd-title{font-size:13px;font-weight:700;color:var(--mf-bright);margin-right:6px}
+.mf-sd-path{flex:1;min-width:180px;font-family:var(--mf-mono)}
+.mf-sd-status{padding:6px 10px;font-size:11px;color:var(--mf-dim);border-bottom:1px solid rgba(53,53,74,.4)}
+.mf-sd-layout{display:grid;grid-template-columns:minmax(220px,36%) 1fr;min-height:360px}
+.mf-sd-list-wrap{border-right:1px solid var(--mf-border);overflow:auto;max-height:520px}
+.mf-sd-file-list{display:flex;flex-direction:column}
+.mf-sd-row{display:grid;grid-template-columns:22px 1fr auto;gap:6px;align-items:center;padding:7px 10px;border-bottom:1px solid rgba(53,53,74,.25);cursor:pointer}
+.mf-sd-row:hover{background:rgba(232,113,10,.08)}
+.mf-sd-row.active{background:rgba(232,113,10,.14);color:var(--mf-primary)}
+.mf-sd-icon{font-size:13px;color:var(--mf-dim)}
+.mf-sd-name{font-family:var(--mf-mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mf-sd-size{font-size:10px;color:var(--mf-dim);white-space:nowrap}
+.mf-sd-editor{display:flex;flex-direction:column;min-width:0}
+.mf-sd-editor-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--mf-border);font-size:12px;color:var(--mf-bright)}
+.mf-sd-editor-head span{font-family:var(--mf-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mf-sd-textarea{flex:1;min-height:320px;width:100%;resize:vertical;border:0;background:var(--mf-bg);color:var(--mf-text);font-family:var(--mf-mono);font-size:11px;line-height:1.55;padding:10px}
+.mf-sd-empty{padding:14px;color:var(--mf-dim);font-size:12px}
+@media (max-width: 767px){.mf-sd-layout{grid-template-columns:1fr}.mf-sd-list-wrap{border-right:0;border-bottom:1px solid var(--mf-border);max-height:260px}.mf-sd-editor-head{align-items:flex-start;flex-direction:column}}

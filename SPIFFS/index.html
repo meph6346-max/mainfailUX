@@ -92,6 +92,33 @@ body{background:var(--mf-bg);color:var(--mf-text);font-family:'Segoe UI',Roboto,
 <div id="mf-page-files" class="mf-page" style="display:none">
 <div id="filesPanel" class="panel panel-default panel-flex-col"><div class="panel-heading"><div class="row"><div class="col-md-12"><div class="pull-left"><table><tr><td><b><span id="fileSource" translate>SD Files</span></b></td><td>&nbsp;&nbsp;</td><td><button id="files_createdir_btn" onclick="files_Createdir()" class="btn btn-info btn-xs hide_it" style=""><svg width="1.5em" height="1.2em" viewBox="5 10 30 10"><rect x="5" y="10" width="30" height="20" rx="2" ry="2" fill="currentColor"></rect><rect x="20" y="5" width="15" height="15" rx="2" ry="2" fill="currentColor"></rect><text x="15" y="25" font-size="18" font-weight="800" fill="#5BC0DE">+</text></svg></button></td><td>&nbsp;&nbsp;</td><td><span id="files_currentPath"></span></td><td>&nbsp;&nbsp;</td><td><div id="files_nav_loader" style="width:1em;height:1em" class="loader hide_it"></div></td></tr></table></div><div class="hide_it pull-right" id="files_uploading_msg"><table><tr><td><span translate>Uploading</span></td><td>&nbsp;</td><td><span class="text-info" id="files_currentUpload_msg"></span></td><td>&nbsp;</td><td width="100px"><progress name="prg" id="files_prg" max="100"></progress></td><td><span id="files_percent_upload"></span>%</td></tr></table></div><div class="pull-right" id="files_navigation_buttons"><div class="item-flex-row-wrap"><button class="btn btn-xs btn-primary" onclick="files_filter_button(this);"><span id="files_filter_glyph" style="position:relative;top:2px"><svg width="1.3em" height="1.2em" viewBox="0 0 1300 1200"><g transform="translate(50,1200) scale(1, -1)"><path fill="currentColor" d="M150 1200h900q21 0 35.5 -14.5t14.5 -35.5t-14.5 -35.5t-35.5 -14.5h-900q-21 0 -35.5 14.5t-14.5 35.5t14.5 35.5t35.5 14.5zM700 500v-300l-200 -200v500l-350 500h900z"></path></g></svg></span></button> &nbsp; <button class="btn btn-xs btn-primary hide_it" id="files_refresh_btn" onclick="files_refreshFiles(files_currentPath)" translate>Refresh</button> <button class="btn btn-xs btn-primary hide_it" id="files_refresh_primary_sd_btn" onclick="files_refreshFiles(primary_sd)">SD 1</button> &nbsp; <button class="btn btn-xs btn-primary hide_it" id="files_refresh_secondary_sd_btn" onclick="files_refreshFiles(secondary_sd)">SD 2</button> &nbsp; <span class="hide_it" id="files_refresh_printer_sd_btn"><button class="btn btn-xs btn-primary" onclick="current_source = printer_sd ;files_refreshFiles(files_currentPath)">SD</button> &nbsp; </span><span class="hide_it" id="files_refresh_tft_sd_btn"><button class="btn btn-xs btn-primary" onclick="current_source = tft_sd ;files_refreshFiles(files_currentPath)">TFT SD</button> &nbsp; </span><span class="hide_it" id="files_refresh_tft_usb_btn"><button class="btn btn-xs btn-primary" onclick="current_source = tft_usb ;files_refreshFiles(files_currentPath)">TFT USB</button> &nbsp; </span><button id="progress_btn" class="btn btn-xs btn-primary" onclick="files_progress()" translate>Progress</button> &nbsp; <button id="abort_btn" class="btn btn-xs btn-primary" onclick="files_abort()" translate>Abort</button> &nbsp; <button id="print_upload_btn" class="btn btn-xs btn-primary" onclick="files_select_upload()" translate>Upload</button> <input type="file" id="files_input_file" onchange="files_check_if_upload()" accept=" .g, .gco, .gcode, .G, .GCO, .GCODE" style="display:none"></div></div></div></div></div><div id="file-body" class="panel-body panel-height panel-max-height panel-scroll panel-flex-main"><div id="files_list_loader" class="loader hide_it" style="margin:auto"></div><ul class="list-group" id="files_fileList"></ul></div><div class="panel-footer panel-footer-height"><div class="row hide_it" id="files_space_sd_status"><div class="col-md-12"><div class="form-inline"><div class="form-group"><span><span translate>Total:</span>&nbsp;<span id="files_sd_status_total"></span></span> <span>&nbsp;|&nbsp;</span> <span><span translate>Used:</span>&nbsp;<span id="files_sd_status_used"> </span></span><span>&nbsp;</span> <span class="noshowonlowres">| &nbsp;</span> <span class="form-inline"><div class="form-group"><span><span translate>Occupation:</span><meter id="files_sd_status_occupation" style="width:150px" min="0" max="100" high="90" value="50"></meter></span><span id="files_sd_status_percent"></span><span>%</span></div></span></div></div></div></div><div class="row hide_it" id="files_status_sd_status"><div class="col-md-12"><span id="files_sd_status_msg">Ok</span></div></div></div></div>
 </div>
+<div id="mf-sd-explorer" class="mf-sd-explorer">
+<div class="mf-sd-toolbar">
+<div class="mf-sd-title">SD File Explorer</div>
+<input id="mf_sd_path" class="form-control mf-sd-path" value="/" spellcheck="false">
+<button class="btn btn-default mf-ph-btn" onclick="mf_sdOpenPath()">Open</button>
+<button class="btn btn-default mf-ph-btn" onclick="mf_sdUp()">Up</button>
+<button class="btn btn-default mf-ph-btn" onclick="mf_sdList()">Refresh</button>
+<button class="btn btn-info mf-ph-btn" onclick="mf_sdNewFolder()">New Folder</button>
+<button class="btn btn-primary mf-ph-btn" onclick="document.getElementById('mf_sd_upload').click()">Upload</button>
+<input id="mf_sd_upload" type="file" multiple style="display:none" onchange="mf_sdUploadFiles(this.files)">
+</div>
+<div class="mf-sd-status" id="mf_sd_status">Ready</div>
+<div class="mf-sd-layout">
+<div class="mf-sd-list-wrap"><div id="mf_sd_file_list" class="mf-sd-file-list"></div></div>
+<div class="mf-sd-editor">
+<div class="mf-sd-editor-head">
+<span id="mf_sd_editor_name">No file selected</span>
+<div>
+<button class="btn btn-default mf-ph-btn" onclick="mf_sdReloadFile()">Reload</button>
+<button class="btn btn-success mf-ph-btn" onclick="mf_sdSaveFile()">Save</button>
+<button class="btn btn-danger mf-ph-btn" onclick="mf_sdDeleteSelected()">Delete</button>
+</div>
+</div>
+<textarea id="mf_sd_editor" class="mf-sd-textarea" spellcheck="false" placeholder="Select a text file to edit."></textarea>
+</div>
+</div>
+</div>
 <div id="mf-page-settings" class="mf-page" style="display:none">
 <div class="mf-settings-nav">
 <button class="mf-stab active" onclick="mf_switchSettingsTab('wifi')" id="mf-stab-wifi">WiFi</button>
