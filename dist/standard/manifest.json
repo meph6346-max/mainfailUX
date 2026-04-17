@@ -11,6 +11,6 @@
     "LITTLEFS/webui/lang/ko.json",
     "LITTLEFS/webui/theme/default.json"
   ],
-  "rawBytes": 881910,
-  "gzipBytes": 194752
+  "rawBytes": 881888,
+  "gzipBytes": 194758
 }
