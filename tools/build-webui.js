@@ -119,8 +119,7 @@ else window.addEventListener('load',function(){setTimeout(mf_loadWebUI,200)});
 function buildStandard() {
   const html = fs.readFileSync(sourceIndex, 'utf8');
   const marker = '/* === Mainfail UX v3.1 - LittleFS Resource Loader === */';
-  const comment = html.indexOf(marker);
-  const start = comment < 0 ? -1 : html.lastIndexOf('<script>', comment);
+  const start = html.indexOf(marker);
   const end = html.lastIndexOf('</body></html>');
   if (start < 0 || end < start) {
     throw new Error('Could not find LittleFS loader block in SPIFFS/index.html');
@@ -134,7 +133,7 @@ function buildStandard() {
     lang_ko: b64('LITTLEFS/webui/lang/ko.json'),
     theme_default: b64('LITTLEFS/webui/theme/default.json')
   };
-  const bundled = html.slice(0, start) + standardLoader(assets) + '\n' + html.slice(end);
+  const bundled = html.slice(0, start) + '\n</script>\n' + standardLoader(assets) + '\n' + html.slice(end);
   fs.mkdirSync(distDir, { recursive: true });
   fs.writeFileSync(standardGz, zlib.gzipSync(Buffer.from(bundled, 'utf8'), { level: 9 }));
   fs.writeFileSync(standardManifest, JSON.stringify({

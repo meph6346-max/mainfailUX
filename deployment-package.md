@@ -53,11 +53,11 @@ Current WebUI asset size is small enough for typical ESP32 LittleFS partitions:
 
 ```text
 LITTLEFS/webui raw total: about 63 KB
-dist/standard/index.html.gz: about 61 KB
+dist/standard/index.html.gz: about 191 KB
 SPIFFS/index.html.gz: about 166 KB
 ```
 
-`dist/standard/index.html.gz` is smaller than the split shell because it replaces the split loader with a compact embedded Mainfail asset bundle.
+`dist/standard/index.html.gz` includes the original ESP3D JavaScript plus the embedded Mainfail asset bundle. It is the correct file for one-file installation.
 
 ## Build
 
