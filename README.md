@@ -114,6 +114,8 @@ dist/
   standard/
     index.html.gz  recommended single-file upload
     manifest.json  generated bundle details
+  uploader/
+    mainfail-webui-uploader.html  local helper page for replacing index.html.gz
 
 tools/
   build-webui.js   regenerates deployable gzip files
@@ -177,3 +179,5 @@ Then upload one of these:
 - Advanced split mode: `SPIFFS/index.html.gz` plus `LITTLEFS/webui/` into `/webui/`
 
 In standard mode, Mainfail user settings are saved in browser storage because one uploaded HTML gzip file cannot rewrite itself. Printer control and G-code file jobs still use Marlin / ESP3D.
+
+For faster WebUI replacement while connected to the printer AP, open `dist/uploader/mainfail-webui-uploader.html` in a browser and select `dist/standard/index.html.gz`.

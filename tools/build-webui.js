@@ -96,7 +96,12 @@ function mf_onFSReady(){
   var legacy=document.getElementById('loadingmsg');
   if(legacy) legacy.style.display='none';
   var ui=document.getElementById('main_ui');
-  if(ui){ui.classList.remove('hide_it');ui.style.display='block'}
+  if(ui){ui.classList.remove('hide_it');ui.style.display='flex'}
+  setTimeout(function(){
+    var visible=false,p=document.querySelectorAll('.mf-page'),i;
+    for(i=0;i<p.length;i++){if(getComputedStyle(p[i]).display!=='none') visible=true}
+    if(!visible&&typeof mf_switchTab==='function') mf_switchTab('dashboard');
+  },50);
 }
 function mf_fixFormIssues(){
   try{

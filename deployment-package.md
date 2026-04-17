@@ -24,6 +24,14 @@ dist/standard/index.html.gz
 
 This file contains the ESP3D shell plus the Mainfail CSS, JavaScript, config, languages, theme, and Live Path view.
 
+For repeated testing, open this helper file locally while connected to the printer AP:
+
+```text
+dist/uploader/mainfail-webui-uploader.html
+```
+
+It posts `index.html.gz` to the board upload endpoint using the same ESP3D form fields.
+
 ## Advanced Split Upload
 
 Use this only when you want to keep editable Mainfail files in ESP32 LittleFS.
