@@ -8,13 +8,38 @@
    mf_updatePrintStatusCard, Extensions, Theme Engine */
 
 function mf_switchTab(t){
+  mf_forceShellLayout();
   document.querySelectorAll('.mf-page').forEach(function(p){p.style.display='none'});
   var pg=document.getElementById('mf-page-'+t);
   if(pg)pg.style.display='block';
   document.querySelectorAll('.mf-nav-item').forEach(function(n){n.classList.remove('active')});
   var nav=document.getElementById('mf-nav-'+t);
   if(nav)nav.classList.add('active');
+  if(t==='dashboard') mf_prepareDashboardPage();
+  if(t==='settings') mf_prepareSettingsPage();
   if(t==='gcode'&&typeof mf_livePathInit==='function') mf_livePathInit();
+}
+
+function mf_forceShellLayout(){
+  var ui=document.getElementById('main_ui');
+  if(ui){ui.classList.remove('hide_it');ui.style.display='flex';ui.style.flexDirection='row';ui.style.alignItems='stretch'}
+  var ov=document.getElementById('mf-overlay');
+  if(ov&&!ov.classList.contains('open')){ov.style.display='none';ov.style.pointerEvents='none'}
+  var main=document.querySelector('.mf-main');
+  if(main){main.style.display='flex';main.style.flexDirection='column';main.style.minWidth='0'}
+}
+
+function mf_prepareDashboardPage(){
+  var mt=document.getElementById('maintab');
+  if(mt) mt.style.display='block';
+}
+
+function mf_prepareSettingsPage(){
+  mf_switchSettingsTab('wifi');
+  var st=document.getElementById('settingstab');
+  if(st){st.style.display='block';st.classList.add('active')}
+  var content=document.getElementById('settings_list_content');
+  if(content) content.classList.remove('hide_it');
 }
 function mf_toggleCard(h){var b=h.nextElementSibling;if(b)b.style.display=b.style.display==='none'?'':'none'}
 function mf_openSidebar(){
@@ -43,6 +68,10 @@ function mf_switchSettingsTab(t){
   document.querySelectorAll('.mf-stab-page').forEach(function(p){p.style.display='none'});
   var pg=document.getElementById('mf-stab-page-'+t);
   if(pg)pg.style.display='block';
+  if(t==='wifi'){
+    var st=document.getElementById('settingstab');
+    if(st){st.style.display='block';st.classList.add('active')}
+  }
   document.querySelectorAll('.mf-stab').forEach(function(n){n.classList.remove('active')});
   var tab=document.getElementById('mf-stab-'+t);
   if(tab)tab.classList.add('active');

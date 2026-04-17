@@ -96,11 +96,17 @@ function mf_onFSReady(){
   var legacy=document.getElementById('loadingmsg');
   if(legacy) legacy.style.display='none';
   var ui=document.getElementById('main_ui');
-  if(ui){ui.classList.remove('hide_it');ui.style.display='flex'}
+  if(ui){ui.classList.remove('hide_it');ui.style.display='flex';ui.style.flexDirection='row';ui.style.alignItems='stretch'}
+  var ov=document.getElementById('mf-overlay');
+  if(ov&&!ov.classList.contains('open')){ov.style.display='none';ov.style.pointerEvents='none'}
+  var main=document.querySelector('.mf-main');
+  if(main){main.style.display='flex';main.style.flexDirection='column';main.style.minWidth='0'}
   setTimeout(function(){
     var visible=false,p=document.querySelectorAll('.mf-page'),i;
     for(i=0;i<p.length;i++){if(getComputedStyle(p[i]).display!=='none') visible=true}
     if(!visible&&typeof mf_switchTab==='function') mf_switchTab('dashboard');
+    var h=(location.hash||'').replace(/^#/,'');
+    if(h&&document.getElementById('mf-page-'+h)&&typeof mf_switchTab==='function') mf_switchTab(h);
   },50);
 }
 function mf_fixFormIssues(){

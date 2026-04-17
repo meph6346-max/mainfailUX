@@ -47,6 +47,7 @@ Connect your computer to the printer AP first, then use the board address below.
   </div>
 
   <button type="submit">Upload index.html.gz</button>
+  <button class="secondary" type="button" onclick="openSettings()">Open Settings</button>
   <p class="small" id="target">Target: http://192.168.0.1/upload, path /</p>
 </form>
 </main>
@@ -58,6 +59,10 @@ function applyHost(){
   document.getElementById('host').value=h;
   document.getElementById('uploadForm').action=h+'/upload';
   document.getElementById('target').textContent='Target: '+h+'/upload, path /';
+}
+function openSettings(){
+  applyHost();
+  window.open(document.getElementById('host').value.replace(/\/+$/,'')+'/#settings','_blank');
 }
 document.getElementById('file').addEventListener('change',function(){
   var f=this.files&&this.files[0];
