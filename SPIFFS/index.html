@@ -363,22 +363,41 @@ function mf_gvSetLayer(){}
 
 
 /* ═══ Mainfail UX v3.0 — SD Resource Loader ═══ */
-var mf_sdOK=false,mf_config=null,mf_lang={};
+var mf_sdOK=false,mf_config=null,mf_lang={},mf_activeSdBase=null;
 
 
 /* ═══ Dynamic SD Path ═══ */
 function mf_sdBase(){
+  if(mf_activeSdBase) return mf_activeSdBase;
   if(typeof primary_sd==='string' && primary_sd) return primary_sd.replace(/\/$/,'');
   if(typeof secondary_sd==='string' && secondary_sd) return secondary_sd.replace(/\/$/,'');
   return '/sd';
 }
 
+function mf_sdBaseCandidates(){
+  var list=[];
+  function add(v){if(!v)return;v=String(v).replace(/\/$/,'');if(list.indexOf(v)<0)list.push(v)}
+  add(typeof primary_sd==='string'?primary_sd:'');
+  add(typeof secondary_sd==='string'?secondary_sd:'');
+  add('/ext');add('/sd');add('/SD');add('');
+  return list;
+}
+
+function mf_isHtmlResponse(txt){
+  txt=String(txt||'').trim().toLowerCase();
+  return txt.charAt(0)==='<' || txt.indexOf('<!doctype')===0 || txt.indexOf('<html')>=0;
+}
+
 function mf_loadSD(){
   var el=document.getElementById('mf-load-msg');
-  if(el) el.textContent='Loading CSS...';
-  mf_loadCSS(mf_sdBase()+'/webui/mainfail.css',function(){
-    if(el) el.textContent='Loading features...';
-    mf_loadScript(mf_sdBase()+'/webui/mainfail.js',function(){
+  if(el) el.textContent='Finding SD webui...';
+  mf_findSDBase(function(base){
+    mf_activeSdBase=base;
+    if(el) el.textContent='Loading CSS...';
+    mf_loadCSS(mf_sdBase()+'/webui/mainfail.css',function(){
+      if(el) el.textContent='Loading features...';
+      mf_loadScript(mf_sdBase()+'/webui/mainfail.js',function(ok){
+        if(!ok){if(el) el.textContent='SD webui JavaScript not found';console.warn('[MF] Mainfail JS unavailable');mf_onSDReady();return}
       if(el) el.textContent='Loading config...';
       mf_loadJSON(mf_sdBase()+'/webui/mainfail.cfg',function(cfg){
         if(!cfg){try{var r=localStorage.getItem('mf_config');if(r){cfg=JSON.parse(r);console.log('[MF] Config from localStorage')}}catch(e){}}
@@ -396,21 +415,46 @@ function mf_loadSD(){
       });
     });
   });
+  });
 }
+
+function mf_findSDBase(cb){
+  var bases=mf_sdBaseCandidates(),i=0;
+  function next(){
+    if(i>=bases.length){console.warn('[MF] No SD webui path found');cb(mf_sdBase());return}
+    var base=bases[i++],url=base+'/webui/mainfail.js?'+Date.now();
+    mf_fetchText(url,function(txt){
+      if(txt && !mf_isHtmlResponse(txt) && txt.indexOf('Mainfail')>=0){console.log('[MF] SD base: '+(base||'/'));cb(base);return}
+      next();
+    },next);
+  }
+  next();
+}
+
+function mf_fetchText(u,ok,fail){
+  var x=new XMLHttpRequest();x.open('GET',u,true);
+  x.onreadystatechange=function(){if(x.readyState===4){x.status===200?ok(x.responseText,x):fail&&fail(x.status,x.responseText)}};
+  x.send();
+}
+
 function mf_loadCSS(u,cb){
-  var l=document.createElement('link');l.rel='stylesheet';l.href=u+'?'+Date.now();
-  l.onload=function(){if(cb)cb()};l.onerror=function(){console.warn('[MF] CSS fail:'+u);if(cb)cb()};
-  document.head.appendChild(l);
+  mf_fetchText(u+'?'+Date.now(),function(txt){
+    if(mf_isHtmlResponse(txt)){console.warn('[MF] CSS returned HTML:'+u);if(cb)cb(false);return}
+    var st=document.createElement('style');st.textContent=txt;document.head.appendChild(st);if(cb)cb(true);
+  },function(){console.warn('[MF] CSS fail:'+u);if(cb)cb(false)});
 }
 function mf_loadScript(u,cb){
-  var s=document.createElement('script');s.src=u+'?'+Date.now();
-  s.onload=function(){if(cb)cb()};s.onerror=function(){console.warn('[MF] JS fail:'+u);if(cb)cb()};
-  document.body.appendChild(s);
+  mf_fetchText(u+'?'+Date.now(),function(txt){
+    if(mf_isHtmlResponse(txt)){console.warn('[MF] JS returned HTML:'+u);if(cb)cb(false);return}
+    try{
+      var s=document.createElement('script');s.text=txt;document.body.appendChild(s);if(cb)cb(true);
+    }catch(e){console.error('[MF] JS eval fail:',e);if(cb)cb(false)}
+  },function(){console.warn('[MF] JS fail:'+u);if(cb)cb(false)});
 }
 function mf_loadJSON(u,cb){
   var x=new XMLHttpRequest();x.open('GET',u+'?'+Date.now(),true);
   x.onreadystatechange=function(){if(x.readyState===4){
-    if(x.status===200){try{cb(JSON.parse(x.responseText))}catch(e){cb(null)}}
+    if(x.status===200&&!mf_isHtmlResponse(x.responseText)){try{cb(JSON.parse(x.responseText))}catch(e){cb(null)}}
     else cb(null);
   }};x.send();
 }
@@ -445,7 +489,7 @@ var mf_gvLoading=false;
 function mf_loadGcodeViewer(){
   if(typeof mf_gvParse==='function'||mf_gvLoading)return;
   mf_gvLoading=true;
-  mf_loadScript(mf_sdBase()+'/webui/js/gcode-viewer.js',function(){mf_gvLoading=false;console.log('[MF] G-code viewer loaded')});
+  mf_loadScript(mf_sdBase()+'/webui/js/gcode-viewer.js',function(ok){mf_gvLoading=false;if(ok)console.log('[MF] G-code viewer loaded');else console.warn('[MF] G-code viewer unavailable')});
 }
 if(document.readyState==='complete')mf_loadSD();
 else window.addEventListener('load',function(){setTimeout(mf_loadSD,200)});
