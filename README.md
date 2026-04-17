@@ -57,7 +57,7 @@ The goal is a Mainsail-like workflow on a small ESP32-class controller:
 - printer status cards
 - EEPROM helper views
 - bed mesh visualization
-- G-code preview tools
+- Live Path motion trace
 - macro and UI settings
 
 The original ESP3D backend behavior is preserved as much as possible. Mainfail wraps and extends the existing UI contract instead of replacing the printer communication stack.
@@ -73,7 +73,7 @@ LittleFS
   themes
   macros
   small JSON settings
-  G-code viewer code
+  Live Path motion trace code
 
 NVS
   firmware/system key-value settings
@@ -143,12 +143,14 @@ Browser
   -> Marlin/ESP3D commands for printer control
 ```
 
-The G-code viewer is loaded only when needed:
+The Live Path view is loaded only when needed:
 
 ```text
 standard mode: bundled gcode-viewer.js
 split mode:    /webui/js/gcode-viewer.js
 ```
+
+Live Path is not a full G-code preview. It uses Marlin-reported position and SD progress lines such as `M154`, `M114`, and `M27` output to draw the current and past motion trace.
 
 ## Current Status
 

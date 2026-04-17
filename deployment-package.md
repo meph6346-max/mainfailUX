@@ -22,7 +22,7 @@ For normal users, upload one file from the ESP3D start screen:
 dist/standard/index.html.gz
 ```
 
-This file contains the ESP3D shell plus the Mainfail CSS, JavaScript, config, languages, theme, and G-code viewer.
+This file contains the ESP3D shell plus the Mainfail CSS, JavaScript, config, languages, theme, and Live Path view.
 
 ## Advanced Split Upload
 

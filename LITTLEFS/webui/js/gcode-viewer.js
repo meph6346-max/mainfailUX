@@ -1,252 +1,332 @@
-/* Mainfail OS v3.0 — G-Code Viewer Module */
-/* SD: /webui/js/gcode-viewer.js (loaded on demand) */
+/* Mainfail OS - Live Path / Motion Trace Monitor */
+/* LittleFS: /webui/js/gcode-viewer.js (loaded on demand) */
 
-/* ═══════════════════════════════════════════
-   G-Code Viewer — 2D Canvas Renderer
-   ═══════════════════════════════════════════ */
-var mf_gv = {
-  lines: [], layers: [], maxLayer: 0, currentLayer: -1,
-  bounds: {xMin:9999,xMax:-9999,yMin:9999,yMax:-9999,zMin:9999,zMax:-9999},
-  pan: {x:0,y:0}, zoom: 1, dragging: false, lastMouse: {x:0,y:0}
+var mf_livePath = {
+  running: false,
+  paused: false,
+  m154Enabled: false,
+  m114Timer: null,
+  m27Timer: null,
+  renderDirty: true,
+  renderQueued: false,
+  maxPoints: 2500,
+  minDistance: 0.08,
+  staleMs: 6000,
+  bed: { x: 220, y: 220 },
+  pos: null,
+  points: [],
+  state: 'idle',
+  file: '',
+  printed: 0,
+  total: 0,
+  progress: 0,
+  startedAt: 0,
+  lastPositionAt: 0,
+  lastLineAt: 0
 };
 
-function mf_gvEl(id){return document.getElementById(id)}
-function mf_gvSetText(id,value){var el=mf_gvEl(id);if(el) el.textContent=value}
-function mf_gvSetValue(id,prop,value){var el=mf_gvEl(id);if(el) el[prop]=value}
-function mf_gvReadNumber(line,key){
-  var m=line.match(new RegExp('(?:^|\\s)'+key+'(-?\\d+(?:\\.\\d+)?)','i'));
-  return m ? parseFloat(m[1]) : null;
+function mf_lpEl(id){return document.getElementById(id)}
+function mf_lpText(id,v){var el=mf_lpEl(id);if(el)el.textContent=v}
+function mf_lpClass(id,c){var el=mf_lpEl(id);if(el)el.className=c}
+
+function mf_livePathInit(){
+  var cfg=window.mf_config||{};
+  if(cfg.printer&&cfg.printer.buildVolume){
+    mf_livePath.bed.x=parseFloat(cfg.printer.buildVolume[0])||220;
+    mf_livePath.bed.y=parseFloat(cfg.printer.buildVolume[1])||220;
+  }
+  mf_livePathBindCanvas();
+  mf_livePathUpdateUI();
+  mf_livePathRender();
+  console.log('[MF] Live Path ready');
 }
 
-function mf_gvLoadFile(input){
-  if(!input.files||!input.files[0]) return;
-  var reader=new FileReader();
-  reader.onload=function(e){
-    mf_gvSetValue('mf_gv_text','value',e.target.result.substring(0,500000));
-    mf_gvParse(e.target.result);
-  };
-  reader.readAsText(input.files[0]);
-  input.value='';
+function mf_livePathStart(){
+  mf_livePath.running=true;
+  mf_livePath.paused=false;
+  if(!mf_livePath.startedAt) mf_livePath.startedAt=Date.now();
+  mf_livePathSetState(mf_livePath.state==='idle'?'monitoring':mf_livePath.state);
+  mf_livePathSend('M154 S2');
+  mf_livePath.m154Enabled=true;
+  mf_livePathSend('M114');
+  mf_livePathSend('M27');
+  mf_livePathSend('M27 C');
+  if(mf_livePath.m114Timer) clearInterval(mf_livePath.m114Timer);
+  if(mf_livePath.m27Timer) clearInterval(mf_livePath.m27Timer);
+  mf_livePath.m114Timer=setInterval(function(){
+    if(mf_livePath.running&&!mf_livePath.paused) mf_livePathSend('M114');
+  },5000);
+  mf_livePath.m27Timer=setInterval(function(){
+    if(mf_livePath.running&&!mf_livePath.paused){mf_livePathSend('M27');mf_livePathSend('M27 C');}
+  },6000);
+  mf_livePathUpdateUI();
 }
 
-function mf_gvParseText(){
-  var el=mf_gvEl('mf_gv_text');
-  var txt=el ? el.value : '';
-  if(txt.trim()) mf_gvParse(txt);
+function mf_livePathPause(){
+  mf_livePath.paused=!mf_livePath.paused;
+  mf_livePathUpdateUI();
 }
 
-function mf_gvLoadFromConsole(){
-  if(typeof Monitor_output!=='undefined' && Monitor_output.length>0){
-    var gcode=Monitor_output.filter(function(l){return l.match&&l.match(/^[GM]\d/);}).join('\n');
-    if(gcode){mf_gvSetValue('mf_gv_text','value',gcode);mf_gvParse(gcode);}
-    else alert('No G-code found in console output.');
-  } else alert('Console is empty.');
+function mf_livePathStop(){
+  mf_livePath.running=false;
+  mf_livePath.paused=false;
+  if(mf_livePath.m114Timer){clearInterval(mf_livePath.m114Timer);mf_livePath.m114Timer=null}
+  if(mf_livePath.m27Timer){clearInterval(mf_livePath.m27Timer);mf_livePath.m27Timer=null}
+  if(mf_livePath.m154Enabled) mf_livePathSend('M154 S0');
+  mf_livePath.m154Enabled=false;
+  mf_livePathSetState(mf_livePath.progress>=100?'complete':'idle');
+  mf_livePathUpdateUI();
 }
 
-function mf_gvParse(text){
-  var lines=text.split('\n');
-  var x=0,y=0,z=0,e=0,f=1000,lastZ=0;
-  var layers=[[]];
-  var b={xMin:Infinity,xMax:-Infinity,yMin:Infinity,yMax:-Infinity};
-  var totalDist=0;
-  var moveCount=0;
+function mf_livePathReset(){
+  mf_livePath.points=[];
+  mf_livePath.pos=null;
+  mf_livePath.printed=0;
+  mf_livePath.total=0;
+  mf_livePath.progress=0;
+  mf_livePath.file='';
+  mf_livePath.startedAt=0;
+  mf_livePath.lastPositionAt=0;
+  mf_livePathSetState('idle');
+  mf_livePathMarkDirty();
+  mf_livePathUpdateUI();
+}
 
-  for(var i=0;i<lines.length;i++){
-    var L=lines[i].trim().split(';')[0];
-    if(!L) continue;
-    var cmd=L.match(/^(G[012])/i);
-    if(!cmd) continue;
-    var c=cmd[1].toUpperCase();
-    var nx=x,ny=y,nz=z,ne=e,nf=f;
-    var v;
-    if((v=mf_gvReadNumber(L,'X'))!==null) nx=v;
-    if((v=mf_gvReadNumber(L,'Y'))!==null) ny=v;
-    if((v=mf_gvReadNumber(L,'Z'))!==null) nz=v;
-    if((v=mf_gvReadNumber(L,'E'))!==null) ne=v;
-    if((v=mf_gvReadNumber(L,'F'))!==null) nf=v;
+function mf_livePathClearTrace(){
+  mf_livePath.points=[];
+  mf_livePathMarkDirty();
+  mf_livePathUpdateUI();
+}
 
-    if(nz!==z && nz>z){
-      layers.push([]);
-      lastZ=nz;
+function mf_livePathSend(cmd){
+  try{
+    if(typeof SendPrinterCommand==='function') SendPrinterCommand(cmd,true);
+    else if(typeof SendCustomCommand==='function'){
+      var input=mf_lpEl('cmd_txt');
+      if(input){input.value=cmd;SendCustomCommand();}
     }
-
-    var extrude=(ne>e);
-    var move={x1:x,y1:y,x2:nx,y2:ny,z:nz,extrude:extrude,rapid:(c==='G0')};
-    if(c==='G1'||c==='G0'){
-      layers[layers.length-1].push(move);
-      if(nx<b.xMin) b.xMin=nx; if(nx>b.xMax) b.xMax=nx;
-      if(ny<b.yMin) b.yMin=ny; if(ny>b.yMax) b.yMax=ny;
-      var dx=nx-x,dy=ny-y;
-      totalDist+=Math.sqrt(dx*dx+dy*dy);
-      moveCount++;
-    }
-    x=nx;y=ny;z=nz;e=ne;f=nf;
-  }
-
-  if(moveCount===0 || !isFinite(b.xMin) || !isFinite(b.yMin)){
-    b={xMin:0,xMax:1,yMin:0,yMax:1};
-    layers=[[]];
-  }
-
-  mf_gv.layers=layers;
-  mf_gv.maxLayer=layers.length-1;
-  mf_gv.bounds=b;
-  mf_gv.currentLayer=-1;
-  mf_gv.pan={x:0,y:0};
-  mf_gv.zoom=1;
-
-  mf_gvSetValue('mf_gv_layer','max',mf_gv.maxLayer);
-  mf_gvSetValue('mf_gv_layer','value',mf_gv.maxLayer);
-  mf_gvSetText('mf_gv_layer_num','All');
-  mf_gvSetText('mf_gv_lines',lines.length.toLocaleString());
-  mf_gvSetText('mf_gv_layers',layers.length);
-  var w=(b.xMax-b.xMin).toFixed(1), h=(b.yMax-b.yMin).toFixed(1);
-  mf_gvSetText('mf_gv_bounds',w+' x '+h+'mm');
-  var estMin=Math.round(totalDist/60/60);
-  mf_gvSetText('mf_gv_time',estMin>0?(estMin+'m'):'<1m');
-
-  mf_gvRender();
+  }catch(e){console.warn('[MF] Live Path command failed:',cmd,e)}
 }
 
-function mf_gvSetLayer(v){
-  var n=parseInt(v);
-  if(n>=mf_gv.maxLayer){
-    mf_gv.currentLayer=-1;
-    mf_gvSetText('mf_gv_layer_num','All');
-  } else {
-    mf_gv.currentLayer=n;
-    mf_gvSetText('mf_gv_layer_num',n+'/'+mf_gv.maxLayer);
+function mf_livePathHandleLine(line){
+  if(!line) return;
+  var s=String(line).trim();
+  if(!s) return;
+  mf_livePath.lastLineAt=Date.now();
+  if(mf_livePathParsePosition(s)) return;
+  if(mf_livePathParseSD(s)) return;
+  if(/printer halted|error:|kill/i.test(s)) mf_livePathSetState('error');
+}
+
+function mf_livePathParsePosition(s){
+  var mx=s.match(/(?:^|\s)X:\s*(-?\d+(?:\.\d+)?)/i);
+  var my=s.match(/(?:^|\s)Y:\s*(-?\d+(?:\.\d+)?)/i);
+  if(!mx||!my) return false;
+  var mz=s.match(/(?:^|\s)Z:\s*(-?\d+(?:\.\d+)?)/i);
+  var x=parseFloat(mx[1]),y=parseFloat(my[1]),z=mz?parseFloat(mz[1]):(mf_livePath.pos?mf_livePath.pos.z:0);
+  if(!isFinite(x)||!isFinite(y)) return false;
+  mf_livePathAddPoint({x:x,y:y,z:isFinite(z)?z:0,t:Date.now()});
+  if(mf_livePath.state==='idle') mf_livePathSetState('monitoring');
+  mf_livePathUpdateUI();
+  return true;
+}
+
+function mf_livePathParseSD(s){
+  var m=s.match(/SD printing byte\s+(\d+)\/(\d+)/i);
+  if(m){
+    mf_livePath.printed=parseInt(m[1],10)||0;
+    mf_livePath.total=parseInt(m[2],10)||0;
+    mf_livePath.progress=mf_livePath.total>0?Math.max(0,Math.min(100,mf_livePath.printed/mf_livePath.total*100)):0;
+    if(!mf_livePath.startedAt) mf_livePath.startedAt=Date.now();
+    mf_livePathSetState('printing');
+    mf_livePathUpdateUI();
+    return true;
   }
-  mf_gvRender();
+  if(/Not SD printing/i.test(s)){
+    if(mf_livePath.state==='printing'||mf_livePath.state==='paused') mf_livePathSetState(mf_livePath.progress>=99.5?'complete':'idle');
+    mf_livePathUpdateUI();
+    return true;
+  }
+  if(/Done printing file/i.test(s)){
+    mf_livePath.progress=100;
+    mf_livePathSetState('complete');
+    mf_livePathUpdateUI();
+    return true;
+  }
+  if(/pause|paused/i.test(s)&&mf_livePath.state==='printing'){
+    mf_livePathSetState('paused');
+    mf_livePathUpdateUI();
+    return true;
+  }
+  var f=s.match(/(?:Current file|File opened|File selected|Now printing|Printing file):\s*(.+)$/i);
+  if(f){
+    mf_livePath.file=f[1].replace(/\s+Size:.*$/i,'').trim();
+    mf_livePathUpdateUI();
+    return true;
+  }
+  return false;
 }
 
-function mf_gvReset(){
-  mf_gv.pan={x:0,y:0};mf_gv.zoom=1;
-  mf_gvRender();
+function mf_livePathAddPoint(p){
+  var prev=mf_livePath.points.length?mf_livePath.points[mf_livePath.points.length-1]:null;
+  mf_livePath.pos=p;
+  mf_livePath.lastPositionAt=p.t;
+  if(prev){
+    var dx=p.x-prev.x,dy=p.y-prev.y,dz=Math.abs((p.z||0)-(prev.z||0));
+    var dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<mf_livePath.minDistance&&dz<0.001&&(p.t-prev.t)<2500) return;
+  }
+  mf_livePath.points.push(p);
+  while(mf_livePath.points.length>mf_livePath.maxPoints) mf_livePath.points.shift();
+  mf_livePathMarkDirty();
 }
 
-function mf_gvRender(){
-  var canvas=document.getElementById('mf_gv_canvas');
+function mf_livePathSetState(s){
+  if(mf_livePath.state===s) return;
+  mf_livePath.state=s;
+  if(typeof mf_setState==='function'){
+    if(s==='printing'||s==='paused'||s==='error'||s==='idle') mf_setState(s);
+  }
+}
+
+function mf_livePathUpdateUI(){
+  var now=Date.now();
+  var stale=mf_livePath.lastPositionAt&&now-mf_livePath.lastPositionAt>mf_livePath.staleMs;
+  var state=stale&&mf_livePath.running?'stale':mf_livePath.state;
+  var pos=mf_livePath.pos;
+  mf_lpText('mf_lp_state',state.toUpperCase());
+  mf_lpClass('mf_lp_state','mf-lp-badge mf-lp-state-'+state);
+  mf_lpText('mf_lp_x',pos?pos.x.toFixed(2):'-');
+  mf_lpText('mf_lp_y',pos?pos.y.toFixed(2):'-');
+  mf_lpText('mf_lp_z',pos?pos.z.toFixed(2):'-');
+  mf_lpText('mf_lp_file',mf_livePath.file||'No active SD file');
+  mf_lpText('mf_lp_bytes',mf_livePath.total?(mf_livePath.printed+' / '+mf_livePath.total):'-');
+  mf_lpText('mf_lp_progress',mf_livePath.progress.toFixed(1)+'%');
+  var bar=mf_lpEl('mf_lp_progress_bar');if(bar)bar.style.width=mf_livePath.progress+'%';
+  mf_lpText('mf_lp_points',String(mf_livePath.points.length));
+  mf_lpText('mf_lp_last',mf_livePath.lastPositionAt?mf_livePathFormatAge(now-mf_livePath.lastPositionAt):'No live position data');
+  mf_lpText('mf_lp_elapsed',mf_livePath.startedAt?mf_livePathFormatDuration(now-mf_livePath.startedAt):'-');
+  var btn=mf_lpEl('mf_lp_pause_btn');if(btn)btn.textContent=mf_livePath.paused?'Resume Trace':'Pause Trace';
+  var hint=mf_lpEl('mf_lp_hint');
+  if(hint) hint.textContent=pos?'Reported position from Marlin telemetry. This is not a full G-code preview.':'No live position data yet. Start Live Path or wait for M154/M114 position reports.';
+  mf_livePathMarkDirty();
+}
+
+function mf_livePathFormatAge(ms){
+  var s=Math.max(0,Math.round(ms/1000));
+  return s<2?'just now':s+'s ago';
+}
+
+function mf_livePathFormatDuration(ms){
+  var s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60);
+  s=s%60;
+  return (h?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+function mf_livePathMarkDirty(){
+  mf_livePath.renderDirty=true;
+  if(!mf_livePath.renderQueued){
+    mf_livePath.renderQueued=true;
+    requestAnimationFrame(function(){mf_livePath.renderQueued=false;mf_livePathRender()});
+  }
+}
+
+function mf_livePathRender(){
+  if(!mf_livePath.renderDirty) return;
+  mf_livePath.renderDirty=false;
+  var canvas=mf_lpEl('mf_gv_canvas');
   if(!canvas) return;
   var ctx=canvas.getContext('2d');
-  var W=canvas.clientWidth, H=canvas.clientHeight;
-  if(!W || !H){W=canvas.width||800;H=canvas.height||600;}
-  canvas.width=W*2; canvas.height=H*2;
-  ctx.scale(2,2);
-
+  var W=canvas.clientWidth||800,H=canvas.clientHeight||520,dpr=window.devicePixelRatio||1;
+  canvas.width=Math.max(1,Math.floor(W*dpr));
+  canvas.height=Math.max(1,Math.floor(H*dpr));
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#0d0d12';
   ctx.fillRect(0,0,W,H);
 
-  if(mf_gv.layers.length===0) return;
+  var margin=32,bx=mf_livePath.bed.x||220,by=mf_livePath.bed.y||220;
+  var scale=Math.min((W-margin*2)/bx,(H-margin*2)/by);
+  var ox=(W-bx*scale)/2,oy=(H-by*scale)/2;
+  function sx(x){return ox+x*scale}
+  function sy(y){return oy+(by-y)*scale}
 
-  var b=mf_gv.bounds;
-  var bw=b.xMax-b.xMin||1, bh=b.yMax-b.yMin||1;
-  var margin=30;
-  var scale=Math.min((W-margin*2)/bw,(H-margin*2)/bh)*mf_gv.zoom;
-  var ox=W/2-(b.xMin+bw/2)*scale+mf_gv.pan.x;
-  var oy=H/2+(b.yMin+bh/2)*scale+mf_gv.pan.y;
-
-  // Grid
-  ctx.strokeStyle='rgba(255,255,255,.04)';
-  ctx.lineWidth=0.5;
-  var gridSize=10*scale;
-  if(gridSize>5){
-    for(var gx=Math.floor(b.xMin/10)*10;gx<=b.xMax;gx+=10){
-      var sx=gx*scale+ox;
-      ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,H);ctx.stroke();
-    }
-    for(var gy=Math.floor(b.yMin/10)*10;gy<=b.yMax;gy+=10){
-      var sy=-gy*scale+oy;
-      ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke();
-    }
-  }
-
-  // Build bed outline
-  ctx.strokeStyle='rgba(255,255,255,.08)';
+  ctx.strokeStyle='rgba(255,255,255,.05)';
   ctx.lineWidth=1;
-  ctx.strokeRect(b.xMin*scale+ox,-b.yMax*scale+oy,bw*scale,bh*scale);
+  var grid=10;
+  for(var x=0;x<=bx;x+=grid){ctx.beginPath();ctx.moveTo(sx(x),oy);ctx.lineTo(sx(x),oy+by*scale);ctx.stroke()}
+  for(var y=0;y<=by;y+=grid){ctx.beginPath();ctx.moveTo(ox,sy(y));ctx.lineTo(ox+bx*scale,sy(y));ctx.stroke()}
 
-  // Draw layers
-  var startLayer=0, endLayer=mf_gv.layers.length-1;
-  if(mf_gv.currentLayer>=0){
-    startLayer=mf_gv.currentLayer;
-    endLayer=mf_gv.currentLayer;
+  ctx.strokeStyle='rgba(232,113,10,.55)';
+  ctx.lineWidth=1.5;
+  ctx.strokeRect(ox,oy,bx*scale,by*scale);
+  ctx.fillStyle='rgba(232,113,10,.85)';
+  ctx.beginPath();ctx.arc(sx(0),sy(0),4,0,Math.PI*2);ctx.fill();
+
+  ctx.fillStyle='rgba(255,255,255,.35)';
+  ctx.font='11px sans-serif';
+  ctx.fillText('X+',ox+bx*scale-18,oy+by*scale+18);
+  ctx.fillText('Y+',ox-24,oy+12);
+
+  var pts=mf_livePath.points;
+  if(!pts.length){
+    ctx.fillStyle='rgba(224,224,234,.45)';
+    ctx.font='14px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('No live position data',W/2,H/2);
+    ctx.textAlign='left';
+    return;
   }
 
-  for(var li=startLayer;li<=endLayer;li++){
-    var layer=mf_gv.layers[li];
-    var alpha=(mf_gv.currentLayer<0)? Math.max(0.15, (li/mf_gv.maxLayer)) : 1;
-
-    for(var mi=0;mi<layer.length;mi++){
-      var mv=layer[mi];
-      var sx1=mv.x1*scale+ox, sy1=-mv.y1*scale+oy;
-      var sx2=mv.x2*scale+ox, sy2=-mv.y2*scale+oy;
-
-      if(mv.rapid){
-        ctx.strokeStyle='rgba(0,180,255,'+alpha*0.3+')';
-        ctx.lineWidth=0.3;
-      } else if(mv.extrude){
-        var hue=30+li/(mf_gv.maxLayer||1)*280;
-        ctx.strokeStyle='hsla('+hue+',80%,55%,'+alpha+')';
-        ctx.lineWidth=0.8;
-      } else {
-        ctx.strokeStyle='rgba(100,100,100,'+alpha*0.3+')';
-        ctx.lineWidth=0.3;
-      }
-      ctx.beginPath();
-      ctx.moveTo(sx1,sy1);
-      ctx.lineTo(sx2,sy2);
-      ctx.stroke();
-    }
+  ctx.lineCap='round';
+  ctx.lineJoin='round';
+  for(var i=1;i<pts.length;i++){
+    var a=pts[i-1],b=pts[i];
+    var age=i/(pts.length-1||1);
+    ctx.strokeStyle='rgba(38,198,218,'+(0.16+age*0.54)+')';
+    ctx.lineWidth=1+(Math.min(1,(b.z||0)/2))*0.7;
+    ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();
   }
+  var tailStart=Math.max(1,pts.length-40);
+  ctx.strokeStyle='rgba(255,202,40,.9)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  for(var j=tailStart;j<pts.length;j++){
+    var p=pts[j];
+    if(j===tailStart)ctx.moveTo(sx(p.x),sy(p.y));else ctx.lineTo(sx(p.x),sy(p.y));
+  }
+  ctx.stroke();
 
-  // Origin marker
-  var osx=0*scale+ox, osy=0*scale+oy;
-  ctx.fillStyle='rgba(232,113,10,.6)';
-  ctx.beginPath();ctx.arc(osx,osy,3,0,Math.PI*2);ctx.fill();
+  var cur=mf_livePath.pos;
+  if(cur){
+    var blink=0.65+Math.sin(Date.now()/180)*0.25;
+    ctx.fillStyle='rgba(232,113,10,'+blink+')';
+    ctx.beginPath();ctx.arc(sx(cur.x),sy(cur.y),7,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.85)';
+    ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.arc(sx(cur.x),sy(cur.y),3,0,Math.PI*2);ctx.stroke();
+  }
 }
 
-// Canvas mouse interaction
-(function(){
-  var c=document.getElementById('mf_gv_canvas');
-  if(!c) return;
-  c.addEventListener('mousedown',function(e){mf_gv.dragging=true;mf_gv.lastMouse={x:e.clientX,y:e.clientY};});
-  c.addEventListener('mousemove',function(e){
-    if(!mf_gv.dragging) return;
-    mf_gv.pan.x+=e.clientX-mf_gv.lastMouse.x;
-    mf_gv.pan.y+=e.clientY-mf_gv.lastMouse.y;
-    mf_gv.lastMouse={x:e.clientX,y:e.clientY};
-    mf_gvRender();
-  });
-  c.addEventListener('mouseup',function(){mf_gv.dragging=false;});
-  c.addEventListener('mouseleave',function(){mf_gv.dragging=false;});
-  c.addEventListener('wheel',function(e){
-    e.preventDefault();
-    var d=e.deltaY>0?0.9:1.1;
-    mf_gv.zoom*=d;
-    mf_gv.zoom=Math.max(0.1,Math.min(50,mf_gv.zoom));
-    mf_gvRender();
-  },{passive:false});
-  // Touch support
-  var lastDist=0;
-  c.addEventListener('touchstart',function(e){
-    if(e.touches.length===1){mf_gv.dragging=true;mf_gv.lastMouse={x:e.touches[0].clientX,y:e.touches[0].clientY};}
-    if(e.touches.length===2){var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;lastDist=Math.sqrt(dx*dx+dy*dy);}
-  });
-  c.addEventListener('touchmove',function(e){
-    e.preventDefault();
-    if(e.touches.length===1&&mf_gv.dragging){
-      mf_gv.pan.x+=e.touches[0].clientX-mf_gv.lastMouse.x;
-      mf_gv.pan.y+=e.touches[0].clientY-mf_gv.lastMouse.y;
-      mf_gv.lastMouse={x:e.touches[0].clientX,y:e.touches[0].clientY};
-      mf_gvRender();
-    }
-    if(e.touches.length===2){
-      var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
-      var dist=Math.sqrt(dx*dx+dy*dy);
-      if(lastDist>0){mf_gv.zoom*=dist/lastDist;mf_gv.zoom=Math.max(0.1,Math.min(50,mf_gv.zoom));mf_gvRender();}
-      lastDist=dist;
-    }
-  },{passive:false});
-  c.addEventListener('touchend',function(){mf_gv.dragging=false;lastDist=0;});
-})();
+function mf_livePathBindCanvas(){
+  var c=mf_lpEl('mf_gv_canvas');
+  if(!c||c._mfLiveBound) return;
+  c._mfLiveBound=true;
+  window.addEventListener('resize',mf_livePathMarkDirty);
+}
+
+setInterval(function(){
+  if(!mf_lpEl('mf_gv_canvas')) return;
+  if(mf_livePath.running) mf_livePathUpdateUI();
+  if(mf_livePath.pos) mf_livePathMarkDirty();
+},1000);
+
+/* Backward-compatible names used by older Mainfail buttons/stubs. */
+function mf_gvReset(){mf_livePathClearTrace()}
+function mf_gvSetLayer(){}
+function mf_gvLoadFile(){}
+function mf_gvParseText(){}
+function mf_gvLoadFromConsole(){}
+function mf_gvParse(){}
+
+mf_livePathInit();

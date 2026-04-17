@@ -14,6 +14,7 @@ function mf_switchTab(t){
   document.querySelectorAll('.mf-nav-item').forEach(function(n){n.classList.remove('active')});
   var nav=document.getElementById('mf-nav-'+t);
   if(nav)nav.classList.add('active');
+  if(t==='gcode'&&typeof mf_livePathInit==='function') mf_livePathInit();
 }
 function mf_toggleCard(h){var b=h.nextElementSibling;if(b)b.style.display=b.style.display==='none'?'':'none'}
 function mf_openSidebar(){
@@ -466,6 +467,7 @@ function mf_interceptLine(line){
 function mf_handleConsoleLine(line){
   if(!line) return;
   var s=String(line).trim();
+  if(typeof mf_livePathHandleLine==='function') mf_livePathHandleLine(s);
   /* Print progress detection */
   if(s.indexOf('SD printing byte')>=0){
     if(mf_state!=='printing') mf_setState('printing');

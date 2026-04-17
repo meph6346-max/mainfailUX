@@ -47,7 +47,7 @@ body{background:var(--mf-bg);color:var(--mf-text);font-family:'Segoe UI',Roboto,
 <button class="mf-nav-item" onclick="mf_switchTab('heightmap')" id="mf-nav-heightmap"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M14 6l-3.75 5 2.85 3.8-1.6 1.2C9.81 13.75 7 10 7 10l-6 8h22L14 6z"/></svg> HEIGHTMAP</button>
 <button class="mf-nav-item" onclick="mf_switchTab('history')" id="mf-nav-history"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 017-7 7 7 0 017 7 7 7 0 01-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg> HISTORY</button>
 <button class="mf-nav-item" onclick="mf_switchTab('eeprom')" id="mf-nav-eeprom"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H7V5h10v14zM8 6h8v2H8V6zm0 3h8v2H8V9zm0 3h5v2H8v-2z"/></svg> EEPROM</button>
-<button class="mf-nav-item" onclick="mf_switchTab('gcode');if(typeof mf_loadGcodeViewer==='function')mf_loadGcodeViewer()" id="mf-nav-gcode"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z"/></svg> G-CODE</button>
+<button class="mf-nav-item" onclick="mf_switchTab('gcode');if(typeof mf_loadGcodeViewer==='function')mf_loadGcodeViewer()" id="mf-nav-gcode"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z"/></svg> LIVE PATH</button>
 <div class="mf-nav-sep"></div>
 <button class="mf-nav-item" onclick="mf_switchTab('camera')" id="mf-nav-camera"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg> CAMERA</button>
 </div>
@@ -207,36 +207,36 @@ body{background:var(--mf-bg);color:var(--mf-text);font-family:'Segoe UI',Roboto,
 </div>
 </div>
 
-<!-- ═══ G-CODE VIEWER PAGE ═══ -->
+<!-- ═══ LIVE PATH PAGE ═══ -->
 <div id="mf-page-gcode" class="mf-page" style="display:none">
 <div class="mf-gv-toolbar">
-<div class="mf-gv-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="var(--mf-primary)"><path d="M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z"/></svg> G-Code Viewer</div>
+<div class="mf-gv-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="var(--mf-primary)"><path d="M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z"/></svg> Live Path</div>
 <div class="mf-gv-controls">
-<label class="mf-gv-label">Layer: <input type="range" id="mf_gv_layer" min="0" max="100" value="100" oninput="mf_gvSetLayer(this.value)"> <span id="mf_gv_layer_num">All</span></label>
-<button class="btn btn-default mf-ph-btn" onclick="mf_gvReset()">Reset View</button>
-<button class="btn btn-default mf-ph-btn" onclick="document.getElementById('mf_gv_file').click()">Load File</button>
-<input type="file" id="mf_gv_file" accept=".gcode,.gco,.g,.nc" style="display:none" onchange="mf_gvLoadFile(this)">
+<button class="btn btn-success mf-ph-btn" onclick="mf_livePathStart()">Start Live Path</button>
+<button class="btn btn-default mf-ph-btn" id="mf_lp_pause_btn" onclick="mf_livePathPause()">Pause Trace</button>
+<button class="btn btn-warning mf-ph-btn" onclick="mf_livePathClearTrace()">Clear Trace</button>
+<button class="btn btn-default mf-ph-btn" onclick="mf_livePathStop()">Stop</button>
+<button class="btn btn-danger mf-ph-btn" onclick="mf_livePathReset()">Reset</button>
 </div>
 </div>
 <div class="mf-gv-container">
 <canvas id="mf_gv_canvas" width="800" height="600"></canvas>
 <div id="mf_gv_info" class="mf-gv-info">
-<div class="mf-gv-stat"><span>Lines</span><b id="mf_gv_lines">0</b></div>
-<div class="mf-gv-stat"><span>Layers</span><b id="mf_gv_layers">0</b></div>
-<div class="mf-gv-stat"><span>Bounds</span><b id="mf_gv_bounds">-</b></div>
-<div class="mf-gv-stat"><span>Est. Time</span><b id="mf_gv_time">-</b></div>
+<div class="mf-gv-stat"><span>State</span><b id="mf_lp_state" class="mf-lp-badge mf-lp-state-idle">IDLE</b></div>
+<div class="mf-gv-stat"><span>Progress</span><b id="mf_lp_progress">0.0%</b></div>
+<div class="mf-gv-stat"><span>Points</span><b id="mf_lp_points">0</b></div>
+<div class="mf-gv-stat"><span>Last Pos</span><b id="mf_lp_last">No live position data</b></div>
 </div>
 </div>
-<div class="mf-gv-paste">
-<div class="mf-ph-desc">Or paste G-code below and click <b>Render</b>:</div>
-<textarea id="mf_gv_text" class="mf-gv-textarea" rows="4" placeholder="G28
-G1 X10 Y10 F3000
-G1 X100 Y10
-G1 X100 Y100
-G1 X10 Y100
-G1 X10 Y10"></textarea>
-<button class="btn btn-default mf-ph-btn" onclick="mf_gvParseText()">Render</button>
-<button class="btn btn-default mf-ph-btn" onclick="mf_gvLoadFromConsole()">Load from Console</button>
+<div class="mf-lp-panel">
+<div class="mf-lp-summary">
+<div class="mf-lp-row"><span>Reported Position</span><b>X <em id="mf_lp_x">-</em> &nbsp; Y <em id="mf_lp_y">-</em> &nbsp; Z <em id="mf_lp_z">-</em></b></div>
+<div class="mf-lp-row"><span>SD File</span><b id="mf_lp_file">No active SD file</b></div>
+<div class="mf-lp-row"><span>SD Bytes</span><b id="mf_lp_bytes">-</b></div>
+<div class="mf-lp-row"><span>Elapsed</span><b id="mf_lp_elapsed">-</b></div>
+</div>
+<div class="mf-lp-progress"><div id="mf_lp_progress_bar"></div></div>
+<div class="mf-ph-desc" id="mf_lp_hint">No live position data yet. Start Live Path or wait for M154/M114 position reports.</div>
 </div>
 </div>
 
@@ -311,6 +311,11 @@ function mf_gvParseText(){}
 function mf_gvLoadFromConsole(){}
 function mf_gvReset(){}
 function mf_gvSetLayer(){}
+function mf_livePathStart(){}
+function mf_livePathPause(){}
+function mf_livePathStop(){}
+function mf_livePathReset(){}
+function mf_livePathClearTrace(){}
 
 </script>
 
@@ -439,7 +444,7 @@ var mf_gvLoading=false;
 function mf_loadGcodeViewer(){
   if(typeof mf_gvParse==='function'||mf_gvLoading)return;
   mf_gvLoading=true;
-  mf_loadScript(mf_webuiBase()+'/js/gcode-viewer.js',function(ok){mf_gvLoading=false;if(ok)console.log('[MF] G-code viewer loaded');else console.warn('[MF] G-code viewer unavailable')});
+  mf_loadScript(mf_webuiBase()+'/js/gcode-viewer.js',function(ok){mf_gvLoading=false;if(ok)console.log('[MF] Live Path loaded');else console.warn('[MF] Live Path unavailable')});
 }
 if(document.readyState==='complete')mf_loadWebUI();
 else window.addEventListener('load',function(){setTimeout(mf_loadWebUI,200)});

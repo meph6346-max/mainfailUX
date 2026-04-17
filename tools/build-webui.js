@@ -113,7 +113,7 @@ function mf_saveConfig(data,cb){
 function mf_loadGcodeViewer(){
   if(typeof mf_gvParse==='function'||mf_gvLoading)return;
   mf_gvLoading=true;
-  mf_injectScript('gcode_viewer_js',function(ok){mf_gvLoading=false;if(ok)console.log('[MF] G-code viewer loaded');else console.warn('[MF] G-code viewer unavailable')});
+  mf_injectScript('gcode_viewer_js',function(ok){mf_gvLoading=false;if(ok)console.log('[MF] Live Path loaded');else console.warn('[MF] Live Path unavailable')});
 }
 if(document.readyState==='complete')mf_loadWebUI();
 else window.addEventListener('load',function(){setTimeout(mf_loadWebUI,200)});
