@@ -19,6 +19,16 @@ function mf_toggleCard(h){var b=h.nextElementSibling;if(b)b.style.display=b.styl
 function mf_openSidebar(){document.getElementById('mf-sidebar').classList.add('open');document.getElementById('mf-overlay').classList.add('open')}
 function mf_closeSidebar(){document.getElementById('mf-sidebar').classList.remove('open');document.getElementById('mf-overlay').classList.remove('open')}
 
+function mf_escapeHtml(v){
+  return String(v == null ? '' : v).replace(/[&<>"']/g,function(ch){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+  });
+}
+
+function mf_sendCommand(cmd){
+  if(typeof SendPrinterCommand==='function') SendPrinterCommand(cmd,true);
+}
+
 /* ═══ Settings Sub-tabs ═══ */
 function mf_switchSettingsTab(t){
   document.querySelectorAll('.mf-stab-page').forEach(function(p){p.style.display='none'});
@@ -64,13 +74,14 @@ function mf_parseEepromLine(line){
   if(!s) return;
   // Strip "echo:" prefix
   s=s.replace(/^echo:\s*/,'');
-  if(!s || s==='ok') return;
-  mf_eeprom.buffer.push(s);
   // Detect end
-  if(s.startsWith('ok') || mf_eeprom.buffer.length > 200){
+  if(s==='ok' || s.startsWith('ok') || mf_eeprom.buffer.length > 200){
     mf_eeprom.capturing=false;
     mf_buildEepromUI();
+    return;
   }
+  if(!s) return;
+  mf_eeprom.buffer.push(s);
 }
 
 function mf_buildEepromUI(){
@@ -121,24 +132,24 @@ function mf_renderEeprom(sections){
   for(var i=0;i<sections.length;i++){
     var sec=sections[i];
     h+='<div class="mf-ee-section">';
-    h+='<div class="mf-ee-header" onclick="this.nextElementSibling.classList.toggle('mf-collapsed');this.querySelector('svg').classList.toggle(\'collapsed\')">'+
+    h+='<div class="mf-ee-header" onclick="this.nextElementSibling.classList.toggle(\'mf-collapsed\');this.querySelector(\'svg\').classList.toggle(\'collapsed\')">'+
        '<svg class="mf-chevron" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg> '+
-       '<span>'+sec.title+'</span></div>';
+       '<span>'+mf_escapeHtml(sec.title)+'</span></div>';
     h+='<div class="mf-ee-body">';
     for(var j=0;j<sec.items.length;j++){
       var it=sec.items[j];
       h+='<div class="mf-ee-row">';
-      h+='<span class="mf-ee-cmd">'+it.cmd+'</span>';
+      h+='<span class="mf-ee-cmd">'+mf_escapeHtml(it.cmd)+'</span>';
       if(it.pairs.length>0){
         for(var k=0;k<it.pairs.length;k++){
           var p=it.pairs[k];
           h+='<label class="mf-ee-param"><span class="mf-ee-key">'+p.key+'</span>'+
-             '<input class="mf-ee-val" type="number" step="any" value="'+p.val+'" data-cmd="'+it.cmd+'" data-key="'+p.key+'" data-orig="'+p.val+'" onchange="mf_eepromChanged(this)"></label>';
+             '<input class="mf-ee-val" type="number" step="any" value="'+mf_escapeHtml(p.val)+'" data-cmd="'+mf_escapeHtml(it.cmd)+'" data-key="'+mf_escapeHtml(p.key)+'" data-orig="'+mf_escapeHtml(p.val)+'" onchange="mf_eepromChanged(this)"></label>';
         }
       } else {
-        h+='<span class="mf-ee-raw">'+it.params+'</span>';
+        h+='<span class="mf-ee-raw">'+mf_escapeHtml(it.params)+'</span>';
       }
-      h+='<button class="mf-ee-send" title="Send this command" onclick="mf_sendEepromLine(this)" data-cmd="'+it.cmd+'" style="display:none">Apply</button>';
+      h+='<button class="mf-ee-send" title="Send this command" onclick="mf_sendEepromLine(this)" data-cmd="'+mf_escapeHtml(it.cmd)+'" style="display:none">Apply</button>';
       h+='</div>';
     }
     h+='</div></div>';
@@ -168,9 +179,7 @@ function mf_sendEepromLine(btn){
     v.style.borderColor='';
   });
   btn.style.display='none';
-  if(typeof SendPrinterCommand==='function'){
-    SendPrinterCommand(cmd+params,true);
-  }
+  mf_sendCommand(cmd+params);
 }
 
 /* ═══════════════════════════════════════════
@@ -244,8 +253,8 @@ function mf_renderMesh(){
     }
   }
   h+='</div>';
-  h+='<div id="heightmap_data" class="mf-raw-output" style="display:block;margin-top:12px;max-height:150px">'+mf_mesh.buffer.join('\n')+'</div>';
-  h+='<div style="margin-top:8px"><button class="btn btn-default mf-ph-btn" onclick="mf_mesh.grid=[];mf_startMeshCapture();SendPrinterCommand('M420 V',true)">Re-read Mesh</button></div>';
+  h+='<div id="heightmap_data" class="mf-raw-output" style="display:block;margin-top:12px;max-height:150px">'+mf_escapeHtml(mf_mesh.buffer.join('\n'))+'</div>';
+  h+='<div style="margin-top:8px"><button class="btn btn-default mf-ph-btn" onclick="mf_mesh.grid=[];mf_startMeshCapture();mf_sendCommand(\'M420 V\')">Re-read Mesh</button></div>';
   container.innerHTML=h;
 }
 
@@ -292,13 +301,13 @@ function mf_updateHistoryUI(){
   }
   var h='<table class="mf-hist-table"><tr><th>File</th><th>Started</th><th>Duration</th><th>Status</th></tr>';
   if(mf_history.currentPrint){
-    h+='<tr class="mf-hist-active"><td>'+mf_history.currentPrint.file+'</td><td>'+new Date(mf_history.currentPrint.start).toLocaleTimeString()+'</td><td><span class="mf-spinner-sm"></span> printing...</td><td><span class="mf-badge-printing">PRINTING</span></td></tr>';
+    h+='<tr class="mf-hist-active"><td>'+mf_escapeHtml(mf_history.currentPrint.file)+'</td><td>'+new Date(mf_history.currentPrint.start).toLocaleTimeString()+'</td><td><span class="mf-spinner-sm"></span> printing...</td><td><span class="mf-badge-printing">PRINTING</span></td></tr>';
   }
   for(var i=0;i<mf_history.log.length;i++){
     var e=mf_history.log[i];
-    var cls=e.status==='complete'?'mf-badge-ok':e.status==='cancelled'?'mf-badge-warn':'mf-badge-err';
-    var label=e.status==='complete'?'DONE':e.status==='cancelled'?'CANCELLED':'UNKNOWN';
-    h+='<tr><td>'+e.file+'</td><td>'+new Date(e.start).toLocaleString()+'</td><td>'+(e.duration||'-')+'</td><td><span class="'+cls+'">'+label+'</span></td></tr>';
+    var cls=(e.status==='complete'||e.status==='completed')?'mf-badge-ok':e.status==='cancelled'?'mf-badge-warn':'mf-badge-err';
+    var label=(e.status==='complete'||e.status==='completed')?'DONE':e.status==='cancelled'?'CANCELLED':'FAILED';
+    h+='<tr><td>'+mf_escapeHtml(e.file)+'</td><td>'+new Date(e.start).toLocaleString()+'</td><td>'+(e.duration||'-')+'</td><td><span class="'+cls+'">'+label+'</span></td></tr>';
   }
   h+='</table>';
   el.innerHTML=h;
@@ -313,7 +322,12 @@ var mf_printStatus = {
   progress: 0
 };
 
-function mf_updatePrintStatusCard(){
+function mf_updatePrintStatusCard(update){
+  if(update){
+    if(typeof update.progress==='number') mf_printStatus.progress=update.progress;
+    if(update.file) mf_printStatus.file=update.file;
+    mf_printStatus.active=true;
+  }
   var card=document.getElementById('mf-print-status-card');
   if(!card) return;
   if(!mf_printStatus.active){
@@ -321,10 +335,10 @@ function mf_updatePrintStatusCard(){
     return;
   }
   card.style.display='block';
-  var pct=mf_printStatus.progress;
+  var pct=Math.max(0,Math.min(100,parseFloat(mf_printStatus.progress)||0));
   card.innerHTML=
     '<div class="mf-ps-header"><svg width="16" height="16" viewBox="0 0 24 24" fill="var(--mf-primary)"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg> Printing</div>'+
-    '<div class="mf-ps-file">'+mf_printStatus.file+'</div>'+
+    '<div class="mf-ps-file">'+mf_escapeHtml(mf_printStatus.file)+'</div>'+
     '<div class="mf-ps-bar-bg"><div class="mf-ps-bar" style="width:'+pct+'%"></div></div>'+
     '<div class="mf-ps-pct">'+pct.toFixed(1)+'%</div>';
 }
@@ -341,79 +355,12 @@ function mf_updatePrintStatusCard(){
   function installHooks(){
     if(_hookInstalled) return;
     _hookInstalled=true;
-
-    // 1. Wrap Monitor_output_Update
-    if(typeof Monitor_output_Update==='function'){
-      var _origMOU=Monitor_output_Update;
-      Monitor_output_Update=function(t){
-        _origMOU(t);
-        if(t && typeof t==='string'){
-          var lines=t.split('\n');
-          for(var i=0;i<lines.length;i++){
-            mf_interceptLine(lines[i]);
-          }
-        }
-      };
-    }
-
-    // 2. Wrap files_print to detect print start
-    if(typeof files_print==='function'){
-      var _origFP=files_print;
-      files_print=function(){
-        _origFP.apply(this,arguments);
-        // Get the filename from files_print_filename or the UI
-        var fn='unknown';
-        try{
-          var el=document.getElementById('files_print_filename');
-          if(el) fn=el.textContent||el.innerText||'unknown';
-        }catch(e){}
-        mf_printStatus.active=true;
-        mf_printStatus.file=fn;
-        mf_printStatus.progress=0;
-        mf_logPrintStart(fn);
-        mf_updatePrintStatusCard();
-      };
-    }
-
-    // 3. Wrap files_progress to track print progress
-    if(typeof files_progress==='function'){
-      var _origFProg=files_progress;
-      files_progress=function(){
-        _origFProg.apply(this,arguments);
-        try{
-          var prgEl=document.getElementById('files_prg');
-          if(prgEl){
-            mf_printStatus.progress=parseFloat(prgEl.value)||0;
-            mf_updatePrintStatusCard();
-            if(mf_printStatus.progress>=100){
-              mf_printStatus.active=false;
-              mf_logPrintEnd('complete');
-              mf_updatePrintStatusCard();
-            }
-          }
-        }catch(e){}
-      };
-    }
-
-    console.log('[Mainfail] Hooks installed');
+    if(typeof mf_setupHooks==='function') mf_setupHooks();
   }
 
   // Line interceptor
   window.mf_interceptLine=function(line){
-    if(!line) return;
-    var s=line.trim();
-    // EEPROM capture
-    if(mf_eeprom.capturing) mf_parseEepromLine(s);
-    // Mesh capture
-    if(mf_mesh.capturing) mf_parseMeshLine(s);
-    // Detect M503 start
-    if(s.indexOf('G21')>-1 || s.indexOf('G20')>-1 || s.indexOf('Linear Units')>-1){
-      if(!mf_eeprom.capturing) mf_startEepromCapture();
-    }
-    // Detect mesh start
-    if(s.indexOf('Bilinear')>-1 || s.indexOf('Mesh Bed')>-1 || s.indexOf('mesh_')>-1){
-      if(!mf_mesh.capturing) mf_startMeshCapture();
-    }
+    mf_handleConsoleLine(line);
   };
 
   // Wrap EEPROM button to start capture before sending
@@ -490,32 +437,46 @@ function mf_writeSD(key, data){
 }
 
 function mf_interceptLine(line){
+  mf_handleConsoleLine(line);
+}
+
+function mf_handleConsoleLine(line){
   if(!line) return;
+  var s=String(line).trim();
   /* Print progress detection */
-  if(line.indexOf('SD printing byte')>=0){
+  if(s.indexOf('SD printing byte')>=0){
     if(mf_state!=='printing') mf_setState('printing');
-    var m=line.match(/byte\s+(\d+)\/(\d+)/);
+    var m=s.match(/byte\s+(\d+)\/(\d+)/);
     if(m){
-      var pct=Math.round(parseInt(m[1])/parseInt(m[2])*100);
+      var total=parseInt(m[2],10);
+      var pct=total>0 ? Math.round(parseInt(m[1],10)/total*100) : 0;
       mf_updatePrintStatusCard({progress:pct,printed:m[1],total:m[2]});
     }
   }
-  if(line.indexOf('Done printing file')>=0){
-    mf_logPrintEnd('completed');
+  if(s.indexOf('Done printing file')>=0){
+    mf_printStatus.active=false;
+    mf_updatePrintStatusCard();
+    mf_logPrintEnd('complete');
     mf_setState('idle');
   }
-  if(line.indexOf('Print aborted')>=0||line.indexOf('Printer halted')>=0){
+  if(s.indexOf('Print aborted')>=0||s.indexOf('Printer halted')>=0){
+    mf_printStatus.active=false;
+    mf_updatePrintStatusCard();
     mf_logPrintEnd('failed');
     mf_setState('error');
   }
+  /* Detect M503 output start */
+  if(s.indexOf('G21')>-1 || s.indexOf('G20')>-1 || s.indexOf('Linear Units')>-1){
+    if(!mf_eeprom.capturing) mf_startEepromCapture();
+  }
+  /* Detect mesh output start */
+  if(s.indexOf('Bilinear')>-1 || s.indexOf('Mesh Bed')>-1 || s.indexOf('mesh_')>-1){
+    if(!mf_mesh.capturing) mf_startMeshCapture();
+  }
   /* EEPROM capture */
-  if(typeof mf_eepromCapturing!=='undefined'&&mf_eepromCapturing){
-    mf_parseEepromLine(line);
-  }
+  if(mf_eeprom.capturing) mf_parseEepromLine(s);
   /* Mesh capture */
-  if(typeof mf_meshCapturing!=='undefined'&&mf_meshCapturing){
-    mf_parseMeshLine(line);
-  }
+  if(mf_mesh.capturing) mf_parseMeshLine(s);
 }
 
 function mf_startPolling(){
@@ -531,12 +492,16 @@ function mf_startPolling(){
 }
 
 function mf_setupHooks(){
+  if(window.mf_hooksInstalled) return;
+  window.mf_hooksInstalled=true;
   /* Hook into ESP3D's Monitor_output_Update for console interception */
   if(typeof Monitor_output_Update==='function'){
     var _orig=Monitor_output_Update;
     Monitor_output_Update=function(msg){
       _orig.apply(this,arguments);
-      try{mf_interceptLine(msg)}catch(e){}
+      try{
+        String(msg || '').split('\n').forEach(function(line){mf_interceptLine(line)});
+      }catch(e){}
     };
     console.log('[MF] Hook: Monitor_output_Update ✓');
   }
@@ -545,11 +510,37 @@ function mf_setupHooks(){
     var _origPrint=files_print;
     files_print=function(){
       var fn=document.getElementById('files_print_filename');
-      if(fn) mf_logPrintStart(fn.textContent||fn.innerText||'unknown');
+      var name=fn?(fn.textContent||fn.innerText||'unknown'):'unknown';
+      mf_printStatus.active=true;
+      mf_printStatus.file=name;
+      mf_printStatus.progress=0;
+      mf_updatePrintStatusCard();
+      mf_logPrintStart(name);
       _origPrint.apply(this,arguments);
       mf_setState('printing');
     };
     console.log('[MF] Hook: files_print ✓');
+  }
+  /* Hook into files_progress for UI progress updates */
+  if(typeof files_progress==='function'){
+    var _origProgress=files_progress;
+    files_progress=function(){
+      _origProgress.apply(this,arguments);
+      try{
+        var prgEl=document.getElementById('files_prg');
+        if(prgEl){
+          mf_printStatus.progress=parseFloat(prgEl.value)||0;
+          mf_updatePrintStatusCard();
+          if(mf_printStatus.progress>=100){
+            mf_printStatus.active=false;
+            mf_updatePrintStatusCard();
+            mf_logPrintEnd('complete');
+            mf_setState('idle');
+          }
+        }
+      }catch(e){}
+    };
+    console.log('[MF] Hook: files_progress ✓');
   }
   /* startSocket safety */
   if(typeof startSocket==='function'){
