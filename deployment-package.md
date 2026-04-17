@@ -1,42 +1,67 @@
-# Mainfail OS v3.0 — Deployment Package
+# Mainfail UX Deployment Package
 
-## Installation
+## Target Architecture
 
-### Step 1: SPIFFS (ESP32 Flash)
-Upload `SPIFFS/index.html.gz` to ESP32 SPIFFS.
-- Via ESP3D web interface: System > SPIFFS > Upload
-- Or via esptool/PlatformIO
+Mainfail UX now uses the release-Marlin + ESP32 LittleFS two-track model.
 
-### Step 2: SD Card
-Copy the entire `SD_CARD/webui/` folder to your SD card root.
-Result: `/webui/mainfail.css`, `/webui/mainfail.js`, etc.
+```text
+Release Marlin
+  printer motion, temperature, SD print jobs, G-code commands
 
-## File Structure
-
-```
-SPIFFS (ESP32 Flash):
-  index.html.gz      155,628 bytes — Boot shell + original ESP3D JS
-
-SD Card (/webui/):
-  mainfail.css       27,146 bytes — Dark theme
-  mainfail.js        21,568 bytes — Custom features
-  mainfail.cfg       1,362 bytes — Config
-  js/gcode-viewer.js 8,000 bytes — G-code viewer
-  lang/en.json       — English
-  lang/ko.json       — Korean
-  theme/default.json — Default theme colors
-  macros/*.gcode     — Macro files
-  mesh/default.json  — Bed mesh data (auto-populated)
-  history.json       — Print history (auto-populated)
+ESP32 LittleFS
+  Mainfail WebUI assets and small Mainfail data
 ```
 
-## Architecture
-- Original ESP3D JS: ZERO modifications (601KB preserved)
-- STUB refactoring: 119 duplicate IDs → 1 (original ESP3D bug)
-- Hook-based extension (Monitor_output_Update, files_print)
-- State Machine: idle/printing/paused/error/disconnected
-- Write-Behind Cache: RAM → dirty flag → flush on idle
-- Safe Mode: falls back if SD unavailable
+The printer SD card is not required for serving Mainfail JavaScript, CSS, language packs, or themes.
 
-## Version
-v3.0 — 2026-04-17
+## Upload Layout
+
+### ESP3D entrypoint
+
+Upload this file as the ESP3D WebUI entrypoint:
+
+```text
+SPIFFS/index.html.gz
+```
+
+### Mainfail LittleFS assets
+
+Upload the `LITTLEFS/webui/` folder to ESP32 LittleFS so the board serves:
+
+```text
+/webui/mainfail.js
+/webui/mainfail.css
+/webui/mainfail.cfg
+/webui/js/gcode-viewer.js
+/webui/lang/en.json
+/webui/lang/ko.json
+/webui/theme/default.json
+/webui/macros/*.gcode
+```
+
+## File Size Snapshot
+
+Current WebUI asset size is small enough for typical ESP32 LittleFS partitions:
+
+```text
+LITTLEFS/webui raw total: about 72 KB
+LITTLEFS/webui gzip total: about 20 KB
+```
+
+`SPIFFS/index.html.gz` contains the ESP3D-compatible shell and loader.
+
+## Build
+
+Regenerate the deployable gzip after editing `SPIFFS/index.html`:
+
+```powershell
+node -e "const fs=require('fs'),zlib=require('zlib');fs.writeFileSync('SPIFFS/index.html.gz',zlib.gzipSync(fs.readFileSync('SPIFFS/index.html'),{level:9}));"
+```
+
+## Notes
+
+- G-code files remain Marlin/ESP3D-managed printer files.
+- Mainfail WebUI assets live in LittleFS, not on the printer SD card.
+- NVS is reserved for small firmware/system key-value settings, not WebUI files.
+- A future custom firmware branch may add direct SD file APIs, but this package does not depend on that.
+
