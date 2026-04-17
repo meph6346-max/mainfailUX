@@ -11,7 +11,20 @@ Mainfail UX does not require SD-card web serving. This is intentional: release M
 
 The old SD-based WebUI strategy has been retired.
 
-Mainfail now assumes:
+Mainfail now has two deployment tracks:
+
+```text
+Standard install
+  dist/standard/index.html.gz
+  Upload this one file from the ESP3D start screen.
+
+Developer / advanced install
+  SPIFFS/index.html.gz
+  LITTLEFS/webui/*
+  Use this when you want editable split files in LittleFS.
+```
+
+The source layout remains:
 
 ```text
 ESP32 LittleFS
@@ -29,6 +42,8 @@ Printer SD card, if present
 ```
 
 That split keeps the UI portable across release Marlin environments while still leaving a future path for custom firmware with direct SD APIs.
+
+For normal users, the standard bundle is the recommended path. It embeds the Mainfail CSS, JavaScript, language files, theme, config, and G-code viewer into one gzip file so ESP3D can install it the same way as a regular WebUI.
 
 ## Why This Exists
 
@@ -80,7 +95,7 @@ NVS is not used as a file store. Large G-code files are not stored in LittleFS.
 ```text
 SPIFFS/
   index.html       source HTML shell
-  index.html.gz    deployable ESP3D entrypoint
+  index.html.gz    split-mode ESP3D entrypoint
 
 LITTLEFS/
   webui/
@@ -94,11 +109,30 @@ LITTLEFS/
     macros/*.gcode
     mesh/default.json
     history.json
+
+dist/
+  standard/
+    index.html.gz  recommended single-file upload
+    manifest.json  generated bundle details
+
+tools/
+  build-webui.js   regenerates deployable gzip files
 ```
 
-`SPIFFS/index.html.gz` is still the entrypoint ESP3D serves as the main page. It then loads Mainfail assets from `/webui/...` on LittleFS.
+`dist/standard/index.html.gz` is the easiest file to upload through the ESP3D start screen. `SPIFFS/index.html.gz` is kept for split LittleFS development and loads Mainfail assets from `/webui/...`.
 
 ## Runtime Model
+
+Standard install:
+
+```text
+Browser
+  -> ESP3D dist/standard/index.html.gz
+  -> bundled Mainfail CSS / JS / config / language / theme / G-code viewer
+  -> Marlin/ESP3D commands for printer control
+```
+
+Split LittleFS install:
 
 ```text
 Browser
@@ -112,7 +146,8 @@ Browser
 The G-code viewer is loaded only when needed:
 
 ```text
-/webui/js/gcode-viewer.js
+standard mode: bundled gcode-viewer.js
+split mode:    /webui/js/gcode-viewer.js
 ```
 
 ## Current Status
@@ -128,14 +163,15 @@ The current architecture is optimized for:
 
 ## Build Notes
 
-After editing `SPIFFS/index.html`, regenerate:
+After editing `SPIFFS/index.html` or anything in `LITTLEFS/webui/`, regenerate deployable files:
 
 ```powershell
-node -e "const fs=require('fs'),zlib=require('zlib');fs.writeFileSync('SPIFFS/index.html.gz',zlib.gzipSync(fs.readFileSync('SPIFFS/index.html'),{level:9}));"
+node tools\build-webui.js
 ```
 
-Then upload:
+Then upload one of these:
 
-- `SPIFFS/index.html.gz` as the ESP3D entrypoint.
-- `LITTLEFS/webui/` into ESP32 LittleFS at `/webui/`.
+- Recommended: `dist/standard/index.html.gz`
+- Advanced split mode: `SPIFFS/index.html.gz` plus `LITTLEFS/webui/` into `/webui/`
 
+In standard mode, Mainfail user settings are saved in browser storage because one uploaded HTML gzip file cannot rewrite itself. Printer control and G-code file jobs still use Marlin / ESP3D.

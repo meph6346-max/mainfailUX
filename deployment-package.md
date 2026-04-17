@@ -14,17 +14,25 @@ ESP32 LittleFS
 
 The printer SD card is not required for serving Mainfail JavaScript, CSS, language packs, or themes.
 
-## Upload Layout
+## Recommended Upload
 
-### ESP3D entrypoint
+For normal users, upload one file from the ESP3D start screen:
+
+```text
+dist/standard/index.html.gz
+```
+
+This file contains the ESP3D shell plus the Mainfail CSS, JavaScript, config, languages, theme, and G-code viewer.
+
+## Advanced Split Upload
+
+Use this only when you want to keep editable Mainfail files in ESP32 LittleFS.
 
 Upload this file as the ESP3D WebUI entrypoint:
 
 ```text
 SPIFFS/index.html.gz
 ```
-
-### Mainfail LittleFS assets
 
 Upload the `LITTLEFS/webui/` folder to ESP32 LittleFS so the board serves:
 
@@ -44,18 +52,19 @@ Upload the `LITTLEFS/webui/` folder to ESP32 LittleFS so the board serves:
 Current WebUI asset size is small enough for typical ESP32 LittleFS partitions:
 
 ```text
-LITTLEFS/webui raw total: about 72 KB
-LITTLEFS/webui gzip total: about 20 KB
+LITTLEFS/webui raw total: about 63 KB
+dist/standard/index.html.gz: about 61 KB
+SPIFFS/index.html.gz: about 166 KB
 ```
 
-`SPIFFS/index.html.gz` contains the ESP3D-compatible shell and loader.
+`dist/standard/index.html.gz` is smaller than the split shell because it replaces the split loader with a compact embedded Mainfail asset bundle.
 
 ## Build
 
-Regenerate the deployable gzip after editing `SPIFFS/index.html`:
+Regenerate deployable gzip files after editing `SPIFFS/index.html` or `LITTLEFS/webui/`:
 
 ```powershell
-node -e "const fs=require('fs'),zlib=require('zlib');fs.writeFileSync('SPIFFS/index.html.gz',zlib.gzipSync(fs.readFileSync('SPIFFS/index.html'),{level:9}));"
+node tools\build-webui.js
 ```
 
 ## Notes
@@ -63,5 +72,5 @@ node -e "const fs=require('fs'),zlib=require('zlib');fs.writeFileSync('SPIFFS/in
 - G-code files remain Marlin/ESP3D-managed printer files.
 - Mainfail WebUI assets live in LittleFS, not on the printer SD card.
 - NVS is reserved for small firmware/system key-value settings, not WebUI files.
+- Standard single-file mode saves Mainfail UI settings in browser storage.
 - A future custom firmware branch may add direct SD file APIs, but this package does not depend on that.
-

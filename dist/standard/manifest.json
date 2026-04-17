@@ -1,0 +1,16 @@
+{
+  "mode": "standard-single-file",
+  "entrypoint": "dist/standard/index.html.gz",
+  "generatedFrom": [
+    "SPIFFS/index.html",
+    "LITTLEFS/webui/mainfail.css",
+    "LITTLEFS/webui/mainfail.js",
+    "LITTLEFS/webui/mainfail.cfg",
+    "LITTLEFS/webui/js/gcode-viewer.js",
+    "LITTLEFS/webui/lang/en.json",
+    "LITTLEFS/webui/lang/ko.json",
+    "LITTLEFS/webui/theme/default.json"
+  ],
+  "rawBytes": 253405,
+  "gzipBytes": 61231
+}

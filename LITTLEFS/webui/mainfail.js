@@ -438,6 +438,15 @@ function mf_flushAll(){
 function mf_writeFS(key, data){
   if(mf_state==='printing'){console.log('[MF] LittleFS write blocked: printing');return}
   var j=JSON.stringify(data,null,2);
+  if(window.mf_storageMode==='standard'){
+    try{
+      localStorage.setItem('mf_'+key,j);
+      console.log('[MF] Browser write '+key+': ok');
+    }catch(e){
+      console.warn('[MF] Browser write '+key+': fail',e);
+    }
+    return;
+  }
   var b=new Blob([j],{type:'application/json'});
   var fd=new FormData();
   fd.append('path','/webui/');
