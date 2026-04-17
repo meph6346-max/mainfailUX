@@ -16,8 +16,16 @@ function mf_switchTab(t){
   if(nav)nav.classList.add('active');
 }
 function mf_toggleCard(h){var b=h.nextElementSibling;if(b)b.style.display=b.style.display==='none'?'':'none'}
-function mf_openSidebar(){document.getElementById('mf-sidebar').classList.add('open');document.getElementById('mf-overlay').classList.add('open')}
-function mf_closeSidebar(){document.getElementById('mf-sidebar').classList.remove('open');document.getElementById('mf-overlay').classList.remove('open')}
+function mf_openSidebar(){
+  var s=document.getElementById('mf-sidebar'), o=document.getElementById('mf-overlay');
+  if(s) s.classList.add('open');
+  if(o) o.classList.add('open');
+}
+function mf_closeSidebar(){
+  var s=document.getElementById('mf-sidebar'), o=document.getElementById('mf-overlay');
+  if(s) s.classList.remove('open');
+  if(o) o.classList.remove('open');
+}
 
 function mf_escapeHtml(v){
   return String(v == null ? '' : v).replace(/[&<>"']/g,function(ch){
@@ -160,6 +168,7 @@ function mf_renderEeprom(sections){
 
 function mf_eepromChanged(inp){
   var row=inp.closest('.mf-ee-row');
+  if(!row) return;
   var btn=row.querySelector('.mf-ee-send');
   var changed=false;
   row.querySelectorAll('.mf-ee-val').forEach(function(v){
@@ -171,7 +180,9 @@ function mf_eepromChanged(inp){
 
 function mf_sendEepromLine(btn){
   var row=btn.closest('.mf-ee-row');
+  if(!row) return;
   var cmd=btn.getAttribute('data-cmd');
+  if(!cmd) return;
   var params='';
   row.querySelectorAll('.mf-ee-val').forEach(function(v){
     params+=' '+v.getAttribute('data-key')+v.value;
@@ -206,16 +217,17 @@ function mf_parseMeshLine(line){
   var s=line.trim();
   if(!s) return;
   s=s.replace(/^echo:\s*/,'');
-  mf_mesh.buffer.push(s);
-  // Try to parse mesh row: numbers separated by spaces/tabs
-  var nums=s.match(/-?\d+\.\d+/g);
-  if(nums && nums.length>=3){
-    mf_mesh.grid.push(nums.map(Number));
-  }
   // Detect end
   if(s.startsWith('ok') || mf_mesh.buffer.length > 100){
     mf_mesh.capturing=false;
     mf_renderMesh();
+    return;
+  }
+  mf_mesh.buffer.push(s);
+  // Try to parse mesh row: numbers separated by spaces/tabs
+  var nums=s.match(/-?\d+(?:\.\d+)?/g);
+  if(nums && nums.length>=3){
+    mf_mesh.grid.push(nums.map(Number));
   }
   // Update raw display
   var el=document.getElementById('mf_heightmap_data');
@@ -226,19 +238,23 @@ function mf_renderMesh(){
   if(mf_mesh.grid.length===0) return;
   var container=document.querySelector('#mf-page-heightmap .mf-placeholder-card');
   if(!container) return;
-  var grid=mf_mesh.grid;
+  var cols=mf_mesh.grid.reduce(function(min,row){
+    return row.length>=3 ? Math.min(min,row.length) : min;
+  },9999);
+  if(cols===9999 || cols<3) return;
+  var grid=mf_mesh.grid.filter(function(row){return row.length>=cols}).map(function(row){return row.slice(0,cols)});
   var rows=grid.length;
-  var cols=grid[0].length;
   // Find min/max
-  var mn=9999,mx=-9999;
+  var mn=Infinity,mx=-Infinity;
   for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
     if(grid[r][c]<mn) mn=grid[r][c];
     if(grid[r][c]>mx) mx=grid[r][c];
   }
+  if(!isFinite(mn) || !isFinite(mx)) return;
   var range=mx-mn||0.01;
   // Build heatmap
-  var cellW=Math.min(60,Math.floor(320/cols));
-  var cellH=Math.min(60,Math.floor(240/rows));
+  var cellW=Math.max(28,Math.min(60,Math.floor(320/cols)));
+  var cellH=Math.max(22,Math.min(60,Math.floor(240/rows)));
   var h='<div class="mf-mesh-info">Mesh: '+cols+'×'+rows+' | Range: '+mn.toFixed(3)+' ~ '+mx.toFixed(3)+' mm | Δ '+(range).toFixed(3)+' mm</div>';
   h+='<div class="mf-mesh-grid" style="display:inline-grid;grid-template-columns:repeat('+cols+','+cellW+'px);gap:2px">';
   for(var r=0;r<rows;r++){

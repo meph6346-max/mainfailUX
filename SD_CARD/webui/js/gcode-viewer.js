@@ -10,11 +10,19 @@ var mf_gv = {
   pan: {x:0,y:0}, zoom: 1, dragging: false, lastMouse: {x:0,y:0}
 };
 
+function mf_gvEl(id){return document.getElementById(id)}
+function mf_gvSetText(id,value){var el=mf_gvEl(id);if(el) el.textContent=value}
+function mf_gvSetValue(id,prop,value){var el=mf_gvEl(id);if(el) el[prop]=value}
+function mf_gvReadNumber(line,key){
+  var m=line.match(new RegExp('(?:^|\\s)'+key+'(-?\\d+(?:\\.\\d+)?)','i'));
+  return m ? parseFloat(m[1]) : null;
+}
+
 function mf_gvLoadFile(input){
   if(!input.files||!input.files[0]) return;
   var reader=new FileReader();
   reader.onload=function(e){
-    document.getElementById('mf_gv_text').value=e.target.result.substring(0,500000);
+    mf_gvSetValue('mf_gv_text','value',e.target.result.substring(0,500000));
     mf_gvParse(e.target.result);
   };
   reader.readAsText(input.files[0]);
@@ -22,25 +30,26 @@ function mf_gvLoadFile(input){
 }
 
 function mf_gvParseText(){
-  var txt=document.getElementById('mf_gv_text').value;
+  var el=mf_gvEl('mf_gv_text');
+  var txt=el ? el.value : '';
   if(txt.trim()) mf_gvParse(txt);
 }
 
 function mf_gvLoadFromConsole(){
   if(typeof Monitor_output!=='undefined' && Monitor_output.length>0){
     var gcode=Monitor_output.filter(function(l){return l.match&&l.match(/^[GM]\d/);}).join('\n');
-    if(gcode){document.getElementById('mf_gv_text').value=gcode;mf_gvParse(gcode);}
+    if(gcode){mf_gvSetValue('mf_gv_text','value',gcode);mf_gvParse(gcode);}
     else alert('No G-code found in console output.');
   } else alert('Console is empty.');
 }
 
 function mf_gvParse(text){
   var lines=text.split('\n');
-  var moves=[];
   var x=0,y=0,z=0,e=0,f=1000,lastZ=0;
   var layers=[[]];
-  var b={xMin:9999,xMax:-9999,yMin:9999,yMax:-9999};
+  var b={xMin:Infinity,xMax:-Infinity,yMin:Infinity,yMax:-Infinity};
   var totalDist=0;
+  var moveCount=0;
 
   for(var i=0;i<lines.length;i++){
     var L=lines[i].trim().split(';')[0];
@@ -49,12 +58,12 @@ function mf_gvParse(text){
     if(!cmd) continue;
     var c=cmd[1].toUpperCase();
     var nx=x,ny=y,nz=z,ne=e,nf=f;
-    var m;
-    if(m=L.match(/X(-?[\d.]+)/i)) nx=parseFloat(m[1]);
-    if(m=L.match(/Y(-?[\d.]+)/i)) ny=parseFloat(m[1]);
-    if(m=L.match(/Z(-?[\d.]+)/i)) nz=parseFloat(m[1]);
-    if(m=L.match(/E(-?[\d.]+)/i)) ne=parseFloat(m[1]);
-    if(m=L.match(/F(-?[\d.]+)/i)) nf=parseFloat(m[1]);
+    var v;
+    if((v=mf_gvReadNumber(L,'X'))!==null) nx=v;
+    if((v=mf_gvReadNumber(L,'Y'))!==null) ny=v;
+    if((v=mf_gvReadNumber(L,'Z'))!==null) nz=v;
+    if((v=mf_gvReadNumber(L,'E'))!==null) ne=v;
+    if((v=mf_gvReadNumber(L,'F'))!==null) nf=v;
 
     if(nz!==z && nz>z){
       layers.push([]);
@@ -69,8 +78,14 @@ function mf_gvParse(text){
       if(ny<b.yMin) b.yMin=ny; if(ny>b.yMax) b.yMax=ny;
       var dx=nx-x,dy=ny-y;
       totalDist+=Math.sqrt(dx*dx+dy*dy);
+      moveCount++;
     }
     x=nx;y=ny;z=nz;e=ne;f=nf;
+  }
+
+  if(moveCount===0 || !isFinite(b.xMin) || !isFinite(b.yMin)){
+    b={xMin:0,xMax:1,yMin:0,yMax:1};
+    layers=[[]];
   }
 
   mf_gv.layers=layers;
@@ -80,15 +95,15 @@ function mf_gvParse(text){
   mf_gv.pan={x:0,y:0};
   mf_gv.zoom=1;
 
-  document.getElementById('mf_gv_layer').max=mf_gv.maxLayer;
-  document.getElementById('mf_gv_layer').value=mf_gv.maxLayer;
-  document.getElementById('mf_gv_layer_num').textContent='All';
-  document.getElementById('mf_gv_lines').textContent=lines.length.toLocaleString();
-  document.getElementById('mf_gv_layers').textContent=layers.length;
+  mf_gvSetValue('mf_gv_layer','max',mf_gv.maxLayer);
+  mf_gvSetValue('mf_gv_layer','value',mf_gv.maxLayer);
+  mf_gvSetText('mf_gv_layer_num','All');
+  mf_gvSetText('mf_gv_lines',lines.length.toLocaleString());
+  mf_gvSetText('mf_gv_layers',layers.length);
   var w=(b.xMax-b.xMin).toFixed(1), h=(b.yMax-b.yMin).toFixed(1);
-  document.getElementById('mf_gv_bounds').textContent=w+'×'+h+'mm';
+  mf_gvSetText('mf_gv_bounds',w+' x '+h+'mm');
   var estMin=Math.round(totalDist/60/60);
-  document.getElementById('mf_gv_time').textContent=estMin>0?(estMin+'m'):'<1m';
+  mf_gvSetText('mf_gv_time',estMin>0?(estMin+'m'):'<1m');
 
   mf_gvRender();
 }
@@ -97,10 +112,10 @@ function mf_gvSetLayer(v){
   var n=parseInt(v);
   if(n>=mf_gv.maxLayer){
     mf_gv.currentLayer=-1;
-    document.getElementById('mf_gv_layer_num').textContent='All';
+    mf_gvSetText('mf_gv_layer_num','All');
   } else {
     mf_gv.currentLayer=n;
-    document.getElementById('mf_gv_layer_num').textContent=n+'/'+mf_gv.maxLayer;
+    mf_gvSetText('mf_gv_layer_num',n+'/'+mf_gv.maxLayer);
   }
   mf_gvRender();
 }
@@ -115,6 +130,7 @@ function mf_gvRender(){
   if(!canvas) return;
   var ctx=canvas.getContext('2d');
   var W=canvas.clientWidth, H=canvas.clientHeight;
+  if(!W || !H){W=canvas.width||800;H=canvas.height||600;}
   canvas.width=W*2; canvas.height=H*2;
   ctx.scale(2,2);
 
