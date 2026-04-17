@@ -8,6 +8,7 @@
    mf_updatePrintStatusCard, Extensions, Theme Engine */
 
 function mf_switchTab(t){
+  mf_recoverPageStructure();
   mf_forceShellLayout();
   document.querySelectorAll('.mf-page').forEach(function(p){p.style.display='none'});
   var pg=document.getElementById('mf-page-'+t);
@@ -21,6 +22,7 @@ function mf_switchTab(t){
 }
 
 function mf_forceShellLayout(){
+  mf_recoverPageStructure();
   var ui=document.getElementById('main_ui');
   if(ui){ui.classList.remove('hide_it');ui.style.display='flex';ui.style.flexDirection='row';ui.style.alignItems='stretch'}
   var ov=document.getElementById('mf-overlay');
@@ -29,15 +31,28 @@ function mf_forceShellLayout(){
   if(main){main.style.display='flex';main.style.flexDirection='column';main.style.minWidth='0'}
 }
 
+function mf_recoverPageStructure(){
+  var content=document.querySelector('.mf-content');
+  if(!content) return;
+  ['dashboard','console','files','settings','heightmap','history','eeprom','gcode','camera'].forEach(function(name){
+    var page=document.getElementById('mf-page-'+name);
+    if(page&&page.parentNode!==content) content.appendChild(page);
+  });
+}
+
+function mf_showOriginalTab(id){
+  var el=document.getElementById(id);
+  if(el){el.style.display='block';el.classList.add('active')}
+}
+
 function mf_prepareDashboardPage(){
-  var mt=document.getElementById('maintab');
-  if(mt) mt.style.display='block';
+  mf_showOriginalTab('maintab');
+  mf_applyPrinterPanelFallback();
 }
 
 function mf_prepareSettingsPage(){
   mf_switchSettingsTab('wifi');
-  var st=document.getElementById('settingstab');
-  if(st){st.style.display='block';st.classList.add('active')}
+  mf_showOriginalTab('settingstab');
   var content=document.getElementById('settings_list_content');
   if(content) content.classList.remove('hide_it');
 }
@@ -65,16 +80,41 @@ function mf_sendCommand(cmd){
 
 /* ═══ Settings Sub-tabs ═══ */
 function mf_switchSettingsTab(t){
+  mf_recoverPageStructure();
   document.querySelectorAll('.mf-stab-page').forEach(function(p){p.style.display='none'});
   var pg=document.getElementById('mf-stab-page-'+t);
   if(pg)pg.style.display='block';
   if(t==='wifi'){
-    var st=document.getElementById('settingstab');
-    if(st){st.style.display='block';st.classList.add('active')}
+    mf_showOriginalTab('settingstab');
+  }
+  if(t==='printer'){
+    mf_showOriginalTab('configtab');
   }
   document.querySelectorAll('.mf-stab').forEach(function(n){n.classList.remove('active')});
   var tab=document.getElementById('mf-stab-'+t);
   if(tab)tab.classList.add('active');
+}
+
+function mf_applyPrinterPanelFallback(){
+  var fw=String(window.target_firmware||'').toLowerCase();
+  if(fw&&fw.indexOf('marlin')<0) return;
+  [
+    ['controlPanel','flex'],
+    ['extruderPanel','flex'],
+    ['filesPanel','flex'],
+    ['commandsPanel','flex']
+  ].forEach(function(item){
+    var el=document.getElementById(item[0]);
+    if(el) el.style.display=item[1];
+  });
+  var temps=document.getElementById('temperaturesPanel');
+  if(temps) temps.style.display='block';
+  var first=document.getElementById('first_extruder_UI');
+  if(first) first.style.display='block';
+  var bed=document.getElementById('temperature_bed');
+  if(bed) bed.style.display='table-row';
+  var fan=document.getElementById('fan_UI');
+  if(fan) fan.style.display='block';
 }
 
 /* ═══ Card Collapse Toggle ═══ */
@@ -608,6 +648,15 @@ function mf_setupHooks(){
     var _origBeep=beep;
     beep=function(){
       try{_origBeep.apply(this,arguments)}catch(e){}
+    };
+  }
+  if(typeof applypreferenceslist==='function'&&!window.mf_applyPreferencesWrapped){
+    window.mf_applyPreferencesWrapped=true;
+    var _origApplyPreferences=applypreferenceslist;
+    applypreferenceslist=function(){
+      var result=_origApplyPreferences.apply(this,arguments);
+      try{mf_recoverPageStructure();mf_applyPrinterPanelFallback()}catch(e){}
+      return result;
     };
   }
   /* beforeunload flush */

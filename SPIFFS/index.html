@@ -289,6 +289,7 @@ body{background:var(--mf-bg);color:var(--mf-text);font-family:'Segoe UI',Roboto,
 /* ═══ Mainfail UX — Pre-SD Stubs ═══ */
 /* These stubs prevent crashes if user clicks before SD JS loads */
 function mf_switchTab(t){
+  mf_recoverPageStructure();
   document.querySelectorAll('.mf-page').forEach(function(p){p.style.display='none'});
   var pg=document.getElementById('mf-page-'+t);
   if(pg)pg.style.display='block';
@@ -296,13 +297,24 @@ function mf_switchTab(t){
   var nav=document.getElementById('mf-nav-'+t);
   if(nav)nav.classList.add('active');
 }
+function mf_recoverPageStructure(){
+  var content=document.querySelector('.mf-content');
+  if(!content)return;
+  ['dashboard','console','files','settings','heightmap','history','eeprom','gcode','camera'].forEach(function(name){
+    var page=document.getElementById('mf-page-'+name);
+    if(page&&page.parentNode!==content)content.appendChild(page);
+  });
+}
 function mf_toggleCard(h){var b=h.nextElementSibling;if(b)b.style.display=b.style.display==='none'?'':'none'}
 function mf_openSidebar(){var s=document.getElementById('mf-sidebar');if(s)s.classList.add('open')}
 function mf_closeSidebar(){var s=document.getElementById('mf-sidebar');if(s)s.classList.remove('open')}
 function mf_switchSettingsTab(t){
+  mf_recoverPageStructure();
   document.querySelectorAll('.mf-stab-page').forEach(function(p){p.style.display='none'});
   var pg=document.getElementById('mf-stab-page-'+t);
   if(pg)pg.style.display='block';
+  if(t==='wifi'){var st=document.getElementById('settingstab');if(st){st.style.display='block';st.classList.add('active')}}
+  if(t==='printer'){var ct=document.getElementById('configtab');if(ct){ct.style.display='block';ct.classList.add('active')}}
   document.querySelectorAll('.mf-stab').forEach(function(s){s.classList.remove('active')});
   var btn=document.getElementById('mf-stab-'+t);
   if(btn)btn.classList.add('active');
@@ -419,6 +431,7 @@ function mf_onFSReady(){
   if(!mf_fsOK){var w=document.getElementById('mf-sd-warn');if(w){w.textContent='Mainfail settings unavailable - changes may not be saved';w.style.display='block'}}
   if(mf_config&&mf_config.dashboardCards) window.mf_savedLayout=mf_config.dashboardCards;
   mf_fixFormIssues();
+  if(typeof mf_recoverPageStructure==='function') mf_recoverPageStructure();
   var ol=document.getElementById('mf-loading');
   if(ol){ol.classList.add('hidden');setTimeout(function(){ol.remove()},600)}
   var legacy=document.getElementById('loadingmsg');
@@ -430,6 +443,7 @@ function mf_onFSReady(){
   var main=document.querySelector('.mf-main');
   if(main){main.style.display='flex';main.style.flexDirection='column';main.style.minWidth='0'}
   setTimeout(function(){
+    if(typeof mf_recoverPageStructure==='function') mf_recoverPageStructure();
     var visible=false,p=document.querySelectorAll('.mf-page'),i;
     for(i=0;i<p.length;i++){if(getComputedStyle(p[i]).display!=='none') visible=true}
     if(!visible&&typeof mf_switchTab==='function') mf_switchTab('dashboard');

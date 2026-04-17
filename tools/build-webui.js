@@ -91,6 +91,7 @@ function mf_onFSReady(){
   console.log('[MF] Standard bundle:'+(mf_fsOK?'OK':'config unavailable'));
   if(mf_config&&mf_config.dashboardCards) window.mf_savedLayout=mf_config.dashboardCards;
   mf_fixFormIssues();
+  if(typeof mf_recoverPageStructure==='function') mf_recoverPageStructure();
   var ol=document.getElementById('mf-loading');
   if(ol){ol.classList.add('hidden');setTimeout(function(){ol.remove()},600)}
   var legacy=document.getElementById('loadingmsg');
@@ -102,6 +103,7 @@ function mf_onFSReady(){
   var main=document.querySelector('.mf-main');
   if(main){main.style.display='flex';main.style.flexDirection='column';main.style.minWidth='0'}
   setTimeout(function(){
+    if(typeof mf_recoverPageStructure==='function') mf_recoverPageStructure();
     var visible=false,p=document.querySelectorAll('.mf-page'),i;
     for(i=0;i<p.length;i++){if(getComputedStyle(p[i]).display!=='none') visible=true}
     if(!visible&&typeof mf_switchTab==='function') mf_switchTab('dashboard');
