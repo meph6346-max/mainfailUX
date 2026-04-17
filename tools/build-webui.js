@@ -93,6 +93,10 @@ function mf_onFSReady(){
   mf_fixFormIssues();
   var ol=document.getElementById('mf-loading');
   if(ol){ol.classList.add('hidden');setTimeout(function(){ol.remove()},600)}
+  var legacy=document.getElementById('loadingmsg');
+  if(legacy) legacy.style.display='none';
+  var ui=document.getElementById('main_ui');
+  if(ui){ui.classList.remove('hide_it');ui.style.display='block'}
 }
 function mf_fixFormIssues(){
   try{
