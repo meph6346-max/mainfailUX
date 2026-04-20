@@ -1,49 +1,41 @@
 # Mainfail UX
 
-ESP3D WebUI mod for release Marlin machines, designed around a two-track storage model:
+ESP3D WebUI mod for release Marlin machines, now organized around a single-file WebUI package:
 
 - **Marlin + ESP3D** keeps printer control, G-code upload, G-code listing, and print commands.
-- **ESP32 LittleFS** serves the Mainfail WebUI assets and small Mainfail user data.
+- **Mainfail WebUI** is shipped as one `index.html.gz` upload package.
+- **Browser storage** keeps Mainfail UI preferences that cannot be written back into the one uploaded HTML file.
 
-Mainfail UX does not require SD-card web serving. This is intentional: release Marlin setups commonly expose SD files through printer commands or ESP3D upload/list APIs, not as static web assets.
+Mainfail UX does not require SD-card web serving or a separate LittleFS asset upload for normal use. This is intentional: release Marlin setups commonly expose SD files through printer commands or ESP3D upload/list APIs, not as static web assets.
 
 ## Project Direction
 
 The old SD-based WebUI strategy has been retired.
 
-Mainfail now has two deployment tracks:
+Mainfail now uses one recommended deployment track:
 
 ```text
 Standard install
   dist/standard/index.html.gz
   Upload this one file from the ESP3D start screen.
-
-Developer / advanced install
-  SPIFFS/index.html.gz
-  LITTLEFS/webui/*
-  Use this when you want editable split files in LittleFS.
 ```
 
-The source layout remains:
+The canonical source is:
 
 ```text
-ESP32 LittleFS
-  /index.html.gz
-  /webui/mainfail.js
-  /webui/mainfail.css
-  /webui/js/gcode-viewer.js
-  /webui/lang/*.json
-  /webui/theme/*.json
-  /webui/macros/*.gcode
-  /webui/mainfail.cfg
+SPIFFS/index.html
+  full single-file Mainfail WebUI source
+
+dist/standard/index.html.gz
+  recommended upload file
 
 Printer SD card, if present
   G-code files managed by Marlin / ESP3D
 ```
 
-That split keeps the UI portable across release Marlin environments while still leaving a future path for custom firmware with direct SD APIs.
+That keeps the UI portable across release Marlin environments while still leaving a future path for custom firmware with direct SD APIs.
 
-For normal users, the standard bundle is the recommended path. It embeds the Mainfail CSS, JavaScript, language files, theme, config, and G-code viewer into one gzip file so ESP3D can install it the same way as a regular WebUI.
+For normal users, `dist/standard/index.html.gz` is the recommended path. It embeds the Mainfail CSS, JavaScript, language data, theme, config, and Live Path code into one gzip file so ESP3D can install it the same way as a regular WebUI.
 
 ## Why This Exists
 
@@ -67,20 +59,13 @@ The original ESP3D backend behavior is preserved as much as possible. Mainfail w
 Use the right storage for the right job.
 
 ```text
-LittleFS
-  Mainfail UI assets
-  language packs
-  themes
-  macros
-  small JSON settings
-  Live Path motion trace code
-
 NVS
   firmware/system key-value settings
   WiFi and ESP3D-level preferences
 
 Browser storage
   per-device UI state
+  Mainfail UI preferences
   temporary viewer state
 
 Printer SD
@@ -94,21 +79,11 @@ NVS is not used as a file store. Large G-code files are not stored in LittleFS.
 
 ```text
 SPIFFS/
-  index.html       source HTML shell
-  index.html.gz    split-mode ESP3D entrypoint
+  index.html       canonical single-file WebUI source
+  index.html.gz    gzip build from the canonical source
 
 LITTLEFS/
-  webui/
-    mainfail.js
-    mainfail.css
-    mainfail.cfg
-    js/gcode-viewer.js
-    lang/en.json
-    lang/ko.json
-    theme/default.json
-    macros/*.gcode
-    mesh/default.json
-    history.json
+  webui/           legacy/reference split assets, not required for normal upload
 
 dist/
   standard/
@@ -118,10 +93,11 @@ dist/
     mainfail-webui-uploader.html  local helper page for replacing index.html.gz
 
 tools/
-  build-webui.js   regenerates deployable gzip files
+  build-webui.js      regenerates deployable gzip files
+  validate-webui.js   checks structure, script syntax, and required runtime hooks
 ```
 
-`dist/standard/index.html.gz` is the easiest file to upload through the ESP3D start screen. `SPIFFS/index.html.gz` is kept for split LittleFS development and loads Mainfail assets from `/webui/...`.
+`dist/standard/index.html.gz` is the easiest file to upload through the ESP3D start screen. `SPIFFS/index.html.gz` is kept as the same WebUI package in the firmware-style source folder.
 
 ## Runtime Model
 
@@ -130,26 +106,13 @@ Standard install:
 ```text
 Browser
   -> ESP3D dist/standard/index.html.gz
-  -> bundled Mainfail CSS / JS / config / language / theme / G-code viewer
-  -> Marlin/ESP3D commands for printer control
-```
-
-Split LittleFS install:
-
-```text
-Browser
-  -> ESP3D index.html.gz
-  -> /webui/mainfail.css
-  -> /webui/mainfail.js
-  -> /webui/mainfail.cfg
   -> Marlin/ESP3D commands for printer control
 ```
 
 The Live Path view is loaded only when needed:
 
 ```text
-standard mode: bundled gcode-viewer.js
-split mode:    /webui/js/gcode-viewer.js
+single-file mode: bundled Live Path code
 ```
 
 Live Path is not a full G-code preview. It uses Marlin-reported position and SD progress lines such as `M154`, `M114`, and `M27` output to draw the current and past motion trace.
@@ -167,17 +130,22 @@ The current architecture is optimized for:
 
 ## Build Notes
 
-After editing `SPIFFS/index.html` or anything in `LITTLEFS/webui/`, regenerate deployable files:
+After editing `SPIFFS/index.html`, regenerate deployable files:
 
 ```powershell
 node tools\build-webui.js
 ```
 
-Then upload one of these:
+Then upload:
 
 - Recommended: `dist/standard/index.html.gz`
-- Advanced split mode: `SPIFFS/index.html.gz` plus `LITTLEFS/webui/` into `/webui/`
 
-In standard mode, Mainfail user settings are saved in browser storage because one uploaded HTML gzip file cannot rewrite itself. Printer control and G-code file jobs still use Marlin / ESP3D.
+Mainfail user settings are saved in browser storage because one uploaded HTML gzip file cannot rewrite itself. Printer control and G-code file jobs still use Marlin / ESP3D.
+
+Before uploading a build, run:
+
+```powershell
+node tools\validate-webui.js 30
+```
 
 For faster WebUI replacement while connected to the printer AP, open `dist/uploader/mainfail-webui-uploader.html` in a browser and select `dist/standard/index.html.gz`.

@@ -2,15 +2,11 @@
   "mode": "standard-single-file",
   "entrypoint": "dist/standard/index.html.gz",
   "generatedFrom": [
-    "SPIFFS/index.html",
-    "LITTLEFS/webui/mainfail.css",
-    "LITTLEFS/webui/mainfail.js",
-    "LITTLEFS/webui/mainfail.cfg",
-    "LITTLEFS/webui/js/gcode-viewer.js",
-    "LITTLEFS/webui/lang/en.json",
-    "LITTLEFS/webui/lang/ko.json",
-    "LITTLEFS/webui/theme/default.json"
+    "SPIFFS/index.html"
   ],
-  "rawBytes": 881888,
-  "gzipBytes": 194758
+  "notes": "SPIFFS/index.html is the canonical single-file Mainfail WebUI source. The gzip outputs are byte-equivalent builds from that source.",
+  "rawBytes": 1135495,
+  "gzipBytes": 276033,
+  "rawSha256": "b057253de4e4bec44cdf9ef459e0f3c36e8882f684b949555880d6729bcaf132",
+  "gzipSha256": "408a607daa8752b683ebd9d61f4857c771e978023b50446a1ada6a606229e8ff"
 }

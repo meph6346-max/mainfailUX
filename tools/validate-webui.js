@@ -4,7 +4,8 @@ const zlib = require('zlib');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const pages = ['dashboard', 'console', 'files', 'settings', 'heightmap', 'history', 'eeprom', 'gcode', 'camera'];
+const requiredPages = ['console', 'files', 'settings', 'heightmap', 'history', 'eeprom', 'gcode'];
+const optionalPages = ['dashboard', 'camera'];
 
 function fail(msg) {
   throw new Error(msg);
@@ -45,17 +46,27 @@ function checkScriptSyntax(html, label) {
 function checkMainfailStructure(html, label) {
   assertSingle(html, '<main class="mf-content">', `${label} mf-content main`);
   assertSingle(html, '<div id="mf-hidden-stubs"', `${label} hidden stubs`);
+  assertSingle(html, 'id="main_ui"', `${label} main_ui`);
   const mainStart = html.indexOf('<main class="mf-content">');
   const mainEnd = html.indexOf('</main>', mainStart);
   const hiddenStart = html.indexOf('<div id="mf-hidden-stubs"');
   if (mainStart < 0 || mainEnd < 0) fail(`${label} missing main region`);
   if (hiddenStart < 0) fail(`${label} missing hidden stubs`);
   if (mainEnd > hiddenStart) fail(`${label} hidden stubs must stay outside mf-content`);
-  pages.forEach((page) => {
+  requiredPages.forEach((page) => {
     const id = `id="mf-page-${page}"`;
     assertSingle(html, id, `${label} ${page} page`);
     const pos = html.indexOf(id);
     if (pos < mainStart || pos > mainEnd) fail(`${label} ${page} page is outside mf-content`);
+  });
+  optionalPages.forEach((page) => {
+    const id = `id="mf-page-${page}"`;
+    const count = countOf(html, id);
+    if (count > 1) fail(`${label} optional ${page} page appears ${count} times`);
+    if (count === 1) {
+      const pos = html.indexOf(id);
+      if (pos < mainStart || pos > mainEnd) fail(`${label} optional ${page} page is outside mf-content`);
+    }
   });
   const region = html.slice(html.indexOf('<div id="main_ui"'), hiddenStart);
   const stack = [];
@@ -103,10 +114,26 @@ function checkBundledAssets(html, label) {
   });
 }
 
+function checkRuntimeFunctions(html, label) {
+  [
+    'mf_switchTab',
+    'SendPrinterCommand',
+    'refreshstatus',
+    'SendJogcommand',
+    'Monitor_output_Clear',
+    'on_autocheck_temperature',
+    'onTempIntervalChange'
+  ].forEach((name) => {
+    const re = new RegExp(`function\\s+${name}\\b|(?:window\\.)?${name}\\s*=\\s*function\\b`);
+    if (!re.test(html)) fail(`${label} missing runtime function ${name}`);
+  });
+}
+
 function validateHtml(html, label) {
   checkMainfailStructure(html, label);
   checkScriptSyntax(html, label);
   checkBundledAssets(html, label);
+  checkRuntimeFunctions(html, label);
 }
 
 function main() {
