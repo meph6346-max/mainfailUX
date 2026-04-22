@@ -3,7 +3,12 @@
 # Mainfail UX
 
 <p align="center">
-  <!-- 스크린샷 준비 중 -->
+  <img src="docs/screenshots/dashboard-desktop.jpg" alt="Mainfail UX dashboard on desktop" width="48%" />
+  <img src="docs/screenshots/theme-orange-mobile.jpg" alt="Mainfail UX theme editor on mobile" width="23%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/card-editor-desktop.jpg" alt="Mainfail UX custom card editor on desktop" width="48%" />
+  <img src="docs/screenshots/heightmap-mobile.jpg" alt="Mainfail UX heightmap on mobile" width="23%" />
 </p>
 
 ---
