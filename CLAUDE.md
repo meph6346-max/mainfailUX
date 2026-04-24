@@ -58,6 +58,27 @@ fd.append('myfile[]', file, fullpath);
 `mf_ensureCfgFolder()` 같은 idempotent createdir을 부팅 시 호출해둔다.
 이미 존재해도 createdir은 안전하다 (에러 콜백 와도 무시).
 
+### SD 파일 읽기 (GET 다운로드) — 중요
+
+업로드 경로와 다운로드 URL은 **다른 규칙**을 쓴다.
+
+- **업로드** (`/upload` POST): 실제 SD 경로 (`/cfg/`, `/macros/`)
+- **다운로드** (파일 GET): ESP3D의 `/SD/` alias endpoint 사용
+
+파일 브라우저 코드 참고: `"/SD/" + files_currentPath + filename`
+
+```js
+// ✅ 올바른 다운로드 URL
+'/SD/cfg/layout.cfg'
+'/SD/macros/start.gco'
+'/SD/cfg/height/bed1.json'
+
+// ❌ 틀림 — 직접 GET은 ESP3D 라우팅에 안 맞아 404/HTML 반환
+'/cfg/layout.cfg'
+```
+
+헬퍼: `mf_sdReadUrl(path)` — 실제 SD 경로 앞에 `/SD` 붙이고 `/` 중복 정규화.
+
 ### 디버깅 참고
 
 - `CancelCurrentUpload`는 `xmlhttpupload` 전역에 의존 — raw XHR로 업로드하면
