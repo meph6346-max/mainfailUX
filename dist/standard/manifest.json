@@ -5,8 +5,8 @@
     "SPIFFS/index.html"
   ],
   "notes": "SPIFFS/index.html is the canonical single-file Mainfail WebUI source. The gzip outputs are byte-equivalent builds from that source.",
-  "rawBytes": 1236847,
-  "gzipBytes": 308028,
-  "rawSha256": "16604436a8bdb3bf68f4c8edcd148d9b519313f8ed56bd69c016f4e001f19aad",
-  "gzipSha256": "52e1c77325de47975c32e35107f6e3d5df58976dd80ea2ca42cace50c86e29e5"
+  "rawBytes": 1246778,
+  "gzipBytes": 310623,
+  "rawSha256": "2f63e5283430928e20be94121e29920afe0d920ad9cceee711846d235dd647b8",
+  "gzipSha256": "4302bb975ddf62309bff4954f7cd029ff9b40fc87afb97ca712d81f07cf440e1"
 }
