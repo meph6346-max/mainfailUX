@@ -1960,7 +1960,7 @@ function mf_assets(){
 function mf_decodeAsset(k){var b=mf_assets()[k];if(!b)return'';return decodeURIComponent(escape(atob(b)))}
 function mf_jsonAsset(k){try{var t=mf_decodeAsset(k);return t?JSON.parse(t):null}catch(e){return null}}
 function mf_saveConfig(d,cb){/* mf_js의 SD 저장 버전 사용 — mf_sdWrite 필요 */if(!d){if(cb)cb(false);return;}mf_config=d;try{localStorage.setItem('mf_config',JSON.stringify(d,null,2));}catch(e){}if(typeof mf_sdWrite==='function'){mf_sdWrite('mainfail.cfg',JSON.stringify(d,null,2),function(ok){if(cb)cb(ok);});}else{if(cb)cb(true);}}
-function mf_loadGcodeViewer(){if(typeof mf_gvParse==='function'||mf_gvLoading)return;mf_gvLoading=true;try{var gvs=document.createElement('script');gvs.textContent=mf_decodeAsset('gcode_viewer_js');document.head.appendChild(gvs);mf_gvLoading=false}catch(e){mf_gvLoading=false;console.warn('[MF] gv load err:',e)}}
+function mf_loadGcodeViewer(){if(typeof mf_gvParse==='function'||mf_gvLoading)return;mf_gvLoading=true;try{var gvs=document.createElement('script');gvs.textContent=mf_decodeAsset('gcode_viewer_js');document.head.appendChild(gvs);mf_gvLoading=false;try{if(typeof mf_livePathInit==='function')mf_livePathInit();}catch(ie){console.warn('[MF] livePathInit err:',ie);}}catch(e){mf_gvLoading=false;console.warn('[MF] gv load err:',e)}}
 
 /* Boot: 순서 보장 체인 로더
  * 1.CSS → 2.JS → 3.theme.cfg → 4.mainfail.cfg → 5.적용 → 완료
