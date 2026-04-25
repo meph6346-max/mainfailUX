@@ -3,17 +3,21 @@
 # Mainfail UX
 
 <p align="center">
-  <img src="docs/screenshots/dashboard-printing.jpg" alt="Mainfail UX — Dashboard while printing" width="49%" />
-  <img src="docs/screenshots/file-explorer.jpg" alt="Mainfail UX — File Explorer" width="49%" />
+  <img src="docs/screenshots/dashboard-printing.png" alt="Mainfail UX — Dashboard while printing" width="49%" />
+  <img src="docs/screenshots/file-explorer.png" alt="Mainfail UX — File Explorer" width="49%" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/gcode-viewer-live.jpg" alt="Mainfail UX — G-code Viewer with live tracking" width="49%" />
-  <img src="docs/screenshots/heightmap.jpg" alt="Mainfail UX — Heightmap with editable mesh cells" width="49%" />
+  <img src="docs/screenshots/gcode-viewer-live.png" alt="Mainfail UX — G-code Viewer with live tracking" width="49%" />
+  <img src="docs/screenshots/heightmap.png" alt="Mainfail UX — Heightmap with editable mesh cells" width="49%" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/shaper.jpg" alt="Mainfail UX — FEMTO Shaper extension" width="60%" />
+  <img src="docs/screenshots/shaper.png" alt="Mainfail UX — FEMTO Shaper extension" width="49%" />
+  <img src="docs/screenshots/add-macro.png" alt="Mainfail UX — MacroAddMenu" width="49%" />
 </p>
-
+<p align="center">
+  <img src="docs/screenshots/add-card.png" alt="Mainfail UX — MacrocardMenu" width="49%" />
+  <img src="docs/screenshots/add-card2.png" alt="Mainfail UX — MacrocardMenu2" width="49%" />
+</p>
 ---
 
 ## What is Mainfail UX?
