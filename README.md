@@ -7,7 +7,7 @@
   <img src="docs/screenshots/file-explorer.png" alt="Mainfail UX — File Explorer" width="49%" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/gcode-viewer-live.png" alt="Mainfail UX — G-code Viewer with live tracking" width="49%" />
+  <img src="docs/screenshots/gcode-viewer-liv.png" alt="Mainfail UX — G-code Viewer with live tracking" width="49%" />
   <img src="docs/screenshots/heightmap.png" alt="Mainfail UX — Heightmap with editable mesh cells" width="49%" />
 </p>
 <p align="center">
