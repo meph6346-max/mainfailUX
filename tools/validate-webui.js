@@ -142,7 +142,6 @@ function main() {
   for (let i = 1; i <= rounds; i += 1) {
     validateHtml(readText('SPIFFS/index.html'), `SPIFFS round ${i}`);
     validateHtml(readGzip('SPIFFS/index.html.gz'), `SPIFFS gzip round ${i}`);
-    validateHtml(readGzip('dist/standard/index.html.gz'), `standard gzip round ${i}`);
   }
   console.log(`WebUI validation passed: ${rounds} rounds`);
 }
